@@ -7,6 +7,7 @@
     <link rel="icon" href="data:," />
     <title>Farming Season Mini App</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="https://unpkg.com/@tonconnect/ui@latest/dist/tonconnect-ui.min.js"></script>
     <style>
       :root{
         --bg:#f7efdb; --card:#fffaf0; --card2:#fdf3da; --ink:#2f2a1e; --muted:#7d7460;
@@ -14,6 +15,9 @@
         --amber:#e8a13a; --amber-soft:#fbeecd; --brown:#8a5a33; --danger:#c0452f;
         --grass:#79b657; --grass-d:#5d9c42; --soil:#a9743f; --wood:#b07f45; --wood-d:#8a5a33;
         --chip:#fff6dd; --shadow:0 2px 8px rgba(90,70,30,.12);
+        /* Tab bar bawah: gradasi hijau daun (atas) → krem (bawah),
+           dan warna teks di atas pil tab aktif. */
+        --tabbar-a:#d8ecb6; --tabbar-b:#f7efdb; --tab-active-ink:#ffffff;
         /* Tinggi viewport Telegram (di-set JS dari viewportStableHeight);
            fallback: 100dvh. --app-safe-top di-set JS dari
            safeAreaInset + contentSafeAreaInset Telegram agar header
@@ -32,6 +36,7 @@
           --amber:#eeb154; --amber-soft:#4a3a1c; --brown:#d09a5f; --danger:#e07a63;
           --grass:#4d7d38; --grass-d:#3f6b2d; --soil:#7d5527; --wood:#8a6136; --wood-d:#6e4c28;
           --chip:#3a3222; --shadow:0 2px 8px rgba(0,0,0,.35);
+          --tabbar-a:#3a5c29; --tabbar-b:#262017; --tab-active-ink:#2c2105;
         }
       }
       *{box-sizing:border-box}
@@ -40,10 +45,10 @@
         overscroll-behavior:none;
         /* Kontrol yang digulir ke tampilan berhenti di atas tab bar +
            ruang badge host, tidak tertutup keduanya. */
-        scroll-padding-bottom:calc(86px + var(--host-badge-clearance))}
+        scroll-padding-bottom:calc(112px + var(--host-badge-clearance))}
       body{margin:0;background:var(--bg);color:var(--ink);
         font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
-        font-size:15px;line-height:1.45;padding-bottom:calc(86px + var(--host-badge-clearance));
+        font-size:15px;line-height:1.45;padding-bottom:calc(112px + var(--host-badge-clearance));
         min-height:100%;min-height:100vh;min-height:100dvh;
         min-height:var(--tg-viewport-stable-height,100dvh);min-height:var(--app-height,100dvh);
         width:100%;overflow-x:hidden;overscroll-behavior-y:none;
@@ -92,22 +97,66 @@
       .stat b{display:block;font-size:16px}
       .stat span{font-size:11.5px;color:var(--muted)}
 
-      /* tabs */
-      .tabbar{position:fixed;left:0;right:0;bottom:var(--host-badge-clearance);z-index:50;background:var(--card);
-        border-top:1px solid var(--line);display:flex;
-        padding:2px 4px calc(2px + var(--app-safe-bottom, env(safe-area-inset-bottom, 0px)))}
-      /* Strip sewarna tab bar mengisi ruang badge di bawah tab bar,
-         supaya konten halaman tidak mengintip di celah itu. */
+      /* tabs — bar bawah: gradasi lembut hijau daun → krem, sudut atas
+         membulat, bayangan halus; tab aktif jadi pil gradasi hijau-emas
+         yang terangkat dengan indikator emas di atasnya. */
+      .tabbar{position:fixed;left:0;right:0;bottom:var(--host-badge-clearance);z-index:50;
+        background:linear-gradient(180deg,var(--tabbar-a) 0%,var(--tabbar-b) 88%);
+        border-top:1px solid var(--line);border-radius:20px 20px 0 0;
+        box-shadow:0 -8px 22px rgba(90,70,30,.20),inset 0 1px 0 rgba(255,255,255,.35);
+        display:flex;gap:2px;
+        padding:7px 6px calc(3px + var(--app-safe-bottom, env(safe-area-inset-bottom, 0px)))}
+      /* Strip sewarna ujung bawah gradasi tab bar mengisi ruang badge di
+         bawah tab bar, supaya konten halaman tidak mengintip di celah itu. */
       .tabbar::after{content:"";position:absolute;left:0;right:0;top:100%;
-        height:var(--host-badge-clearance);background:var(--card)}
-      .tabbar button{flex:1;background:transparent;border:none;border-radius:12px;min-height:48px;
-        display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;
-        font-size:11px;font-weight:600;color:var(--muted);padding:4px 2px;position:relative}
-      .tabbar button .tic{font-size:20px;line-height:1.1}
-      .tabbar button.active{color:var(--green-d);background:var(--green-soft)}
+        height:var(--host-badge-clearance);background:var(--tabbar-b)}
+      .tabbar button{flex:1 1 0;min-width:0;background:transparent;border:none;border-radius:16px;min-height:48px;
+        display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
+        font-size:10.5px;font-weight:600;color:var(--muted);padding:5px 1px 4px;position:relative;
+        -webkit-tap-highlight-color:transparent;
+        transition:transform .18s ease,background .18s ease,color .18s ease,box-shadow .18s ease}
+      .tabbar button .tic{font-size:23px;line-height:1.15;display:block;opacity:.8;filter:saturate(.8);
+        transition:transform .18s ease,opacity .18s ease,filter .18s ease}
+      .tabbar button .tab-label{white-space:nowrap;letter-spacing:-.2px;line-height:1.15}
+      /* Efek tekan: tab sedikit membesar */
+      .tabbar button:active{transform:scale(1.07)}
+      .tabbar button:active .tic{transform:scale(1.18)}
+      /* Tab aktif: pil gradasi hijau → emas, terangkat, ikon & teks menonjol */
+      .tabbar button.active{color:var(--tab-active-ink);font-weight:800;
+        background:linear-gradient(150deg,var(--green) 5%,#7cab3e 55%,var(--amber) 120%);
+        box-shadow:0 6px 14px rgba(76,120,40,.38),inset 0 1px 0 rgba(255,255,255,.35);
+        transform:translateY(-4px)}
+      .tabbar button.active:active{transform:translateY(-4px) scale(1.05)}
+      .tabbar button.active .tic{opacity:1;filter:none;transform:scale(1.22);
+        text-shadow:0 2px 5px rgba(60,40,0,.35)}
+      .tabbar button.active .tab-label{font-size:11px;text-shadow:0 1px 3px rgba(60,40,0,.30)}
+      /* Indikator emas melayang di atas tab aktif */
+      .tabbar button.active::before{content:"";position:absolute;top:-8px;left:50%;transform:translateX(-50%);
+        width:28px;height:5px;border-radius:99px;
+        background:linear-gradient(90deg,var(--amber),#ffd968);
+        box-shadow:0 1px 5px rgba(160,110,20,.55)}
+      @media (prefers-reduced-motion: no-preference){
+        .tabbar button.active .tic{animation:tabpop .35s ease}
+      }
+      @keyframes tabpop{0%{transform:scale(.85)}55%{transform:scale(1.34)}100%{transform:scale(1.22)}}
       .tab-badge{position:absolute;top:2px;right:calc(50% - 22px);background:var(--danger);color:#fff;
         font-size:10px;font-weight:800;min-width:17px;height:17px;border-radius:99px;
         display:flex;align-items:center;justify-content:center;padding:0 4px}
+      /* Tombol atas Premium: terpisah dari tab bar bawah,
+         latar emas lembut agar menonjol, tetap terlihat (status bar sticky). */
+      .top-nav{display:flex;gap:8px;margin-top:10px}
+      .top-nav-btn{flex:1 1 0;min-width:0;display:flex;align-items:center;justify-content:center;gap:7px;
+        min-height:44px;border-radius:14px;border:1.5px solid var(--amber);
+        background:var(--amber-soft);color:var(--ink);
+        font-weight:800;font-size:14.5px;padding:9px 10px;
+        box-shadow:0 3px 8px rgba(160,110,20,.22);
+        -webkit-tap-highlight-color:transparent;
+        transition:transform .15s ease,background .15s ease,box-shadow .15s ease}
+      .top-nav-btn .tic{font-size:20px;line-height:1}
+      .top-nav-btn .tab-label{white-space:nowrap}
+      .top-nav-btn:active{transform:scale(.97)}
+      .top-nav-btn.active{background:linear-gradient(150deg,var(--amber),#ffd968);color:#3a2a08;
+        border-color:#c07f22;box-shadow:0 5px 12px rgba(160,110,20,.42)}
       .tabpage{display:none}.tabpage.active{display:block}
 
       /* seeds & plots */
@@ -180,7 +229,7 @@
         padding:10px;margin-bottom:8px;background:var(--card2)}
 
       /* toast & modal */
-      #toasts{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(96px + var(--host-badge-clearance));z-index:99;
+      #toasts{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(122px + var(--host-badge-clearance));z-index:99;
         display:flex;flex-direction:column;gap:6px;align-items:center;pointer-events:none;width:max-content;max-width:92vw}
       .toast{background:#2f2a1e;color:#fdf6dd;padding:9px 16px;border-radius:99px;font-size:13.5px;font-weight:600;
         box-shadow:0 4px 14px rgba(0,0,0,.3);animation:tin .25s ease}
@@ -191,6 +240,15 @@
       .modal{background:var(--card);border-radius:18px;padding:18px;max-width:420px;width:100%}
       .divider{height:1px;background:var(--line);margin:12px 0}
       .lock-note{background:var(--amber-soft);border:1px solid var(--amber);border-radius:12px;padding:10px;font-size:13px}
+      /* Premium Pass */
+      .premium-card{border:2px solid var(--amber)}
+      .sim-badge{display:inline-flex;align-items:center;background:var(--danger);color:#fff;
+        font-size:11px;font-weight:800;letter-spacing:.6px;border-radius:999px;padding:3px 10px;text-transform:uppercase}
+      .premium-status{display:inline-flex;align-items:center;gap:5px;border-radius:999px;padding:5px 11px;
+        font-weight:700;font-size:13px;border:1px solid var(--line);background:var(--card)}
+      .premium-status.on{background:var(--green-soft);border-color:var(--green);color:var(--green-d)}
+      .premium-benefits{margin:8px 0;padding-left:20px}
+      .premium-benefits li{margin:4px 0}
     </style>
   </head>
   <body>
@@ -209,6 +267,9 @@
           <span class="small muted"><span id="sb-xp">0</span> XP</span>
         </div>
         <div class="xpbar"><i id="sb-xpbar" style="width:0%"></i></div>
+        <div class="top-nav">
+          <button class="top-nav-btn" data-tab="premium" id="top-btn-premium"><span class="tic">👑</span><span class="tab-label">Premium</span></button>
+        </div>
       </div>
     </div>
 
@@ -279,15 +340,23 @@
       <!-- GRAM -->
       <section class="tabpage" id="page-gram">
         <div class="card">
-          <h2 id="wallet-title">👛 Dompet Gram (Simulasi)</h2>
+          <h2 id="wallet-title">👛 Dompet Gram</h2>
           <div class="row-between">
-            <div><div class="small muted" id="gram-bal-label">Saldo Gram</div><div style="font-size:22px;font-weight:800">💎 <span id="gram-bal">0</span></div></div>
-            <div style="text-align:right"><div class="small muted" id="wallet-addr-label">Alamat</div><b id="wallet-addr">Belum terhubung</b></div>
+            <div><div class="small muted" id="gram-bal-label">Saldo Gram (dalam game)</div><div style="font-size:22px;font-weight:800">💎 <span id="gram-bal">0</span></div></div>
+          </div>
+          <p class="tiny muted" style="margin-top:6px" id="gram-bal-note">Saldo ini berasal dari tukar koin &amp; hadiah di dalam game.</p>
+          <div class="divider"></div>
+          <h3 id="ton-title">💎 Dompet TON Asli — TON Connect</h3>
+          <div class="row-between" style="margin-top:6px">
+            <div><div class="small muted" id="wallet-addr-label">Alamat dompet TON kamu</div><b id="wallet-addr">Belum terhubung</b></div>
+            <span class="pill" id="ton-status">Belum terhubung</span>
           </div>
           <div class="row" style="margin-top:10px">
-            <button class="btn-amber grow" id="btn-wallet">Hubungkan Dompet (Simulasi)</button>
+            <button class="btn-amber grow" id="btn-ton-connect">Hubungkan Dompet</button>
+            <button class="btn-danger grow" id="btn-ton-disconnect" style="display:none">Putuskan</button>
           </div>
-          <p class="tiny muted" style="margin-top:8px" id="wallet-note">Ini simulasi di dalam game — tidak ada Gram asli yang bergerak dan tidak ada dompet asli yang terhubung.</p>
+          <p class="tiny muted" style="margin-top:8px" id="wallet-note">Hubungkan dompet TON asli kamu (Tonkeeper, Wallet di Telegram, MyTonWallet) lewat TON Connect untuk membayar Premium Pass &amp; item Toko Premium dengan Gram asli.</p>
+          <div class="lock-note" style="margin-top:10px" id="ton-verify-note">⚠️ Pembayaran Gram asli sudah bisa dicoba lewat TON Connect, tetapi verifikasi di server belum ada — jadi pemberian item setelah pembayaran masih mengandalkan konfirmasi dari dompetmu di perangkat ini, belum diverifikasi di blockchain oleh server.</div>
         </div>
 
         <div class="card">
@@ -316,6 +385,13 @@
         <div class="card">
           <h2 id="shop-title">💎 Toko Premium</h2>
           <div id="shop-list"></div>
+        </div>
+      </section>
+
+      <!-- PREMIUM -->
+      <section class="tabpage" id="page-premium">
+        <div class="card premium-card" id="premium-card">
+          <div id="premium-content" class="premium-content"></div>
         </div>
       </section>
 
@@ -412,6 +488,112 @@ var TH_MAXPLOTS = [3,12,16,20,25];
 var TH_UPGRADE  = [0,20000,30000,40000,50000]; /* index = level tujuan */
 var FEED_STOCK_MAX = 20, FED_MAX_MS = 60*60*1000, ANIMAL_MAX = 5;
 var GRAM_PER_10000 = 0.01; /* 10.000 koin = 0,01 Gram */
+/* Alamat dompet TON pemilik game — tujuan pembayaran Gram asli setelah
+   pembayaran asli (TON Connect + server verifikasi) diaktifkan. */
+var OWNER_WALLET_ADDRESS = "UQANu_RDTuCC1eVucSyVIOhpkDp2hmNQ8oqtMlP56uJe8CQk";
+/* ================= TON CONNECT (DOMPET TON ASLI) =================
+   Library resmi TON Connect UI dimuat dari CDN di <head>.
+   Manifest aplikasi dilayani dari hosting GitHub Pages game ini
+   (file data:application/json;base64,eyJpY29uVXJsIjoiaHR0cHM6Ly9raXp1cmFrb3JlYS1jb2xsYWIuZ2l0aHViLmlvL0Zhcm1pbmctc2Vhc29uL2Fzc2V0cy9pY29uLnBuZyIsIm5hbWUiOiJGYXJtaW5nIFNlYXNvbiIsInVybCI6Imh0dHBzOi8va2l6dXJha29yZWEtY29sbGFiLmdpdGh1Yi5pby9GYXJtaW5nLXNlYXNvbi8ifQ== di repo yang sama). */
+var TONCONNECT_MANIFEST_URL = "https://kizurakorea-collab.github.io/Farming-season/assets/tonconnect-manifest.json";
+var tonConnectUI = null;      /* instance TonConnectUI */
+var tonWalletRaw = "";        /* alamat raw dompet pemain yang terhubung */
+var tonWalletFriendly = "";   /* alamat ramah-pengguna (UQ…/EQ…) */
+function shortAddr(a){ return a && a.length > 14 ? a.slice(0, 6) + "…" + a.slice(-6) : (a || ""); }
+function tonFriendly(raw){
+  try {
+    if (window.TON_CONNECT_UI && typeof TON_CONNECT_UI.toUserFriendlyAddress === "function") return TON_CONNECT_UI.toUserFriendlyAddress(raw);
+  } catch(e) {}
+  return raw;
+}
+function tonConnected(){ return !!(tonConnectUI && tonConnectUI.connected && tonWalletRaw); }
+function renderTonWallet(){
+  var addrEl = document.getElementById("wallet-addr");
+  var stEl = document.getElementById("ton-status");
+  var bc = document.getElementById("btn-ton-connect");
+  var bd = document.getElementById("btn-ton-disconnect");
+  if (!addrEl) return;
+  if (tonConnected()) {
+    var disp = tonWalletFriendly || tonWalletRaw;
+    addrEl.textContent = shortAddr(disp);
+    addrEl.title = disp;
+    if (stEl) stEl.textContent = tr("Terhubung ✓", "Connected ✓");
+    if (bc) bc.style.display = "none";
+    if (bd) bd.style.display = "";
+  } else {
+    addrEl.textContent = tr("Belum terhubung", "Not connected");
+    addrEl.title = "";
+    if (stEl) stEl.textContent = tr("Belum terhubung", "Not connected");
+    if (bc) bc.style.display = "";
+    if (bd) bd.style.display = "none";
+  }
+}
+function initTonConnect(){
+  if (tonConnectUI) return tonConnectUI;
+  if (typeof window.TON_CONNECT_UI === "undefined" || !TON_CONNECT_UI.TonConnectUI) return null;
+  try {
+    tonConnectUI = new TON_CONNECT_UI.TonConnectUI({
+      manifestUrl: TONCONNECT_MANIFEST_URL,
+      actionsConfiguration: { twaReturnUrl: "https://t.me/Farm_simulatorbot" }
+    });
+    tonConnectUI.onStatusChange(function(wallet){
+      if (wallet && wallet.account && wallet.account.address) {
+        tonWalletRaw = wallet.account.address;
+        tonWalletFriendly = tonFriendly(tonWalletRaw);
+        if (typeof S !== "undefined" && S) { S.wallet = true; save(); }
+        toast(tr("👛 Dompet TON terhubung: ", "👛 TON wallet connected: ") + shortAddr(tonWalletFriendly || tonWalletRaw));
+      } else {
+        tonWalletRaw = ""; tonWalletFriendly = "";
+        if (typeof S !== "undefined" && S) { S.wallet = false; save(); }
+      }
+      renderTonWallet();
+    });
+    if (tonConnectUI.connectionRestored && tonConnectUI.connectionRestored.then) {
+      tonConnectUI.connectionRestored.then(function(){ renderTonWallet(); }).catch(function(){});
+    }
+  } catch(e) { tonConnectUI = null; }
+  renderTonWallet();
+  return tonConnectUI;
+}
+function tonConnectWallet(){
+  var ui = initTonConnect();
+  if (!ui) { toast(tr("⚠️ TON Connect gagal dimuat — periksa koneksi internet lalu coba lagi", "⚠️ TON Connect failed to load — check your internet connection and try again")); haptic("error"); return; }
+  if (tonConnected()) { renderTonWallet(); return; }
+  try { ui.openModal(); } catch(e) { toast(tr("⚠️ Gagal membuka TON Connect", "⚠️ Failed to open TON Connect")); haptic("error"); }
+}
+function tonDisconnectWallet(){
+  if (!tonConnectUI) return;
+  try {
+    var p = tonConnectUI.disconnect();
+    if (p && p.catch) p.catch(function(){});
+  } catch(e) {}
+  tonWalletRaw = ""; tonWalletFriendly = "";
+  if (typeof S !== "undefined" && S) { S.wallet = false; save(); }
+  renderTonWallet();
+  toast(tr("👛 Dompet TON diputuskan", "👛 TON wallet disconnected")); haptic();
+}
+/* Kirim pembayaran Gram asli ke dompet pemilik lewat TON Connect.
+   onSuccess dipanggil hanya setelah pemain mengonfirmasi di dompetnya
+   dan transaksi terkirim dari perangkat ini (belum ada verifikasi server). */
+function payWithTon(amountGram, onSuccess){
+  if (!tonConnected()) {
+    toast(tr("👛 Hubungkan dompet TON dulu lewat tombol Hubungkan Dompet di tab Gram", "👛 Connect your TON wallet first with the Connect Wallet button in the Gram tab"));
+    haptic("error");
+    return;
+  }
+  var nano = String(Math.round(amountGram * 1000000000));
+  var tx = {
+    validUntil: Math.floor(Date.now() / 1000) + 600,
+    messages: [ { address: OWNER_WALLET_ADDRESS, amount: nano } ]
+  };
+  toast(tr("💎 Buka dompet TON kamu untuk mengonfirmasi pembayaran…", "💎 Open your TON wallet to confirm the payment…"));
+  tonConnectUI.sendTransaction(tx).then(function(){
+    toast(tr("✅ Pembayaran Gram terkirim dari dompetmu", "✅ Gram payment sent from your wallet")); haptic("success");
+    if (onSuccess) onSuccess();
+  }).catch(function(){
+    toast(tr("❌ Pembayaran dibatalkan atau gagal — tidak ada Gram yang terkirim", "❌ Payment cancelled or failed — no Gram was sent")); haptic("error");
+  });
+}
 var MISSION_POOL = [
   {key:"plant",   label:"Tanam benih", labelEn:"Plant seeds",        target:5,  rc:150, rx:10},
   {key:"harvest", label:"Panen tanaman", labelEn:"Harvest crops",      target:5,  rc:200, rx:12},
@@ -555,6 +737,7 @@ function freshState() {
     daily: null,
     inviteCode: genCode(), friends: [], milesClaimed: [], redeemed: false,
     wallet: false, withdrawals: [],
+    premiumUntil: 0, premiumLastClaim: "",
     musicOn: false, startDate: todayStr(), selAnimal: null, lang: LANG
   };
 }
@@ -607,6 +790,9 @@ function addXp(n){
   var before = playerLevel(); S.xp += n;
   if (playerLevel() > before) { toast(tr("🎉 Naik ke Level ", "🎉 Reached Level ") + playerLevel() + "!"); haptic("success"); }
 }
+function addCoins(n){
+  S.coins += n;
+}
 function toast(msg){
   var t = document.createElement("div"); t.className = "toast"; t.textContent = msg;
   $("toasts").appendChild(t);
@@ -614,6 +800,20 @@ function toast(msg){
   setTimeout(function(){ t.remove(); }, 2800);
 }
 function spendCoins(n){ if (S.coins < n) { toast(tr("🪙 Koin tidak cukup", "🪙 Not enough coins")); haptic("error"); return false; } S.coins -= n; return true; }
+
+/* ================= PREMIUM PASS (GRAM ASLI VIA TON CONNECT) ================= */
+var PREMIUM_PRICE_GRAM = 0.5, PREMIUM_DAYS = 30, PREMIUM_DAILY_COINS = 1000;
+function premiumActive(){ return !!(S && S.premiumUntil && S.premiumUntil > nowMs()); }
+function premiumDaysLeft(){ if (!premiumActive()) return 0; return Math.ceil((S.premiumUntil - nowMs()) / 86400000); }
+function sellMultiplier(){ return premiumActive() ? 2 : 1; }
+function effectivePlots(){ return S.plotsOwned + (premiumActive() ? 1 : 0); }
+function ensurePlots(){
+  var eff = effectivePlots();
+  while (S.plots.length < eff) S.plots.push(null);
+  /* Petak bonus yang sudah kosong dibuang lagi setelah pass berakhir;
+     petak bonus yang masih ada tanamannya dipertahankan sampai dipanen. */
+  while (S.plots.length > eff && !S.plots[S.plots.length-1]) S.plots.pop();
+}
 
 /* ================= AUDIO: MUSIK + SUARA HEWAN ================= */
 var AC = null;
@@ -732,8 +932,8 @@ function renderStatus(){
 function renderTH(){
   $("th-level").textContent = S.th;
   $("th-max").textContent = TH_MAXPLOTS[S.th-1];
-  $("th-owned").textContent = S.plotsOwned;
-  $("th-plots-pill").textContent = "🌱 " + S.plotsOwned + " " + tr("petak", "plots");
+  $("th-owned").textContent = effectivePlots();
+  $("th-plots-pill").textContent = "🌱 " + effectivePlots() + " " + tr("petak", "plots") + (premiumActive() ? " 👑" : "");
   $("th-animals").textContent = S.animals.length;
   var bp = $("btn-buy-plot");
   if (S.plotsOwned >= TH_MAXPLOTS[S.th-1]) { bp.disabled = true; bp.textContent = S.th >= 5 ? tr("Petak Maksimal (25)", "Max Plots (25)") : tr("Petak Penuh — Upgrade Balai Kota", "Plots Full — Upgrade Town Hall"); }
@@ -776,9 +976,10 @@ function renderSeeds(){
   });
 }
 function renderPlots(){
+  ensurePlots();
   var g = $("plot-grid"); g.innerHTML = "";
   var t = nowMs();
-  for (var i=0;i<S.plotsOwned;i++) {
+  for (var i=0;i<S.plots.length;i++) {
     var p = S.plots[i] || null;
     var b = document.createElement("button");
     if (!p) {
@@ -906,7 +1107,7 @@ function renderPens(){
       else if (act === "sell" && a) {
         var A2 = ANIMALS[a.type];
         if (!confirmInPage(tr("Jual " + aName(A2) + " #" + a.num + " seharga " + fmt(A2.sellBack) + " 🪙?", "Sell " + aName(A2) + " #" + a.num + " for " + fmt(A2.sellBack) + " 🪙?"))) return;
-        S.coins += A2.sellBack;
+        addCoins(A2.sellBack);
         S.animals = S.animals.filter(function(x){ return x.uid !== a.uid; });
         delete penPos[a.uid];
         toast(A2.em + " " + aName(A2) + " #" + a.num + tr(" terjual", " sold")); haptic(); save(); renderAll();
@@ -965,12 +1166,15 @@ function renderMarket(){
   var ids = Object.keys(S.inv).filter(function(id){ return S.inv[id] > 0; });
   var total = 0;
   if (!ids.length) list.innerHTML = '<p class="muted small">' + tr("Gudang kosong — panen tanaman atau ambil produk hewan dulu.", "Storage is empty — harvest crops or collect animal products first.") + '</p>';
+  var mult = sellMultiplier();
+  if (mult > 1) list.innerHTML = '<p class="small" style="margin-bottom:6px">👑 <b>Premium Pass ' + tr("aktif", "active") + '</b> — ' + tr("harga jual semua hasil 2× lipat!", "all produce sells for 2×!") + '</p>' + list.innerHTML;
   ids.forEach(function(id){
     var info = itemInfo(id), n = S.inv[id];
-    total += info.sell * n;
+    var price = info.sell * mult;
+    total += price * n;
     var row = document.createElement("div"); row.className = "inv-row";
-    row.innerHTML = '<span class="em">' + info.em + '</span><div class="grow"><b>' + info.name + '</b><div class="small muted">' + n + ' item · ' + info.sell + ' 🪙 / item</div></div>' +
-      '<button class="btn-small" data-sell1="' + id + '">' + tr("Jual 1", "Sell 1") + '</button><button class="btn-small btn-green" data-sellall="' + id + '">' + tr("Jual Semua · ", "Sell All · ") + fmt(info.sell*n) + ' 🪙</button>';
+    row.innerHTML = '<span class="em">' + info.em + '</span><div class="grow"><b>' + info.name + '</b><div class="small muted">' + n + ' item · ' + price + ' 🪙 / item' + (mult > 1 ? ' (2× 👑)' : '') + '</div></div>' +
+      '<button class="btn-small" data-sell1="' + id + '">' + tr("Jual 1", "Sell 1") + '</button><button class="btn-small btn-green" data-sellall="' + id + '">' + tr("Jual Semua · ", "Sell All · ") + fmt(price*n) + ' 🪙</button>';
     list.appendChild(row);
   });
   $("inv-total").textContent = fmt(total) + " 🪙";
@@ -980,9 +1184,10 @@ function renderMarket(){
 function sellItem(id, n){
   if (!S.inv[id] || n <= 0) return;
   var info = itemInfo(id);
-  S.inv[id] -= n; S.coins += info.sell * n;
+  var gain = info.sell * sellMultiplier() * n;
+  S.inv[id] -= n; addCoins(gain);
   track("sell", n); addXp(n);
-  toast("🏪 " + info.name + " ×" + n + tr(" terjual", " sold") + " · +" + fmt(info.sell*n) + " 🪙"); haptic("success");
+  toast("🏪 " + info.name + " ×" + n + tr(" terjual", " sold") + " · +" + fmt(gain) + " 🪙" + (sellMultiplier() > 1 ? " (2× 👑)" : "")); haptic("success");
   save(); renderAll();
 }
 
@@ -1006,7 +1211,7 @@ function renderMissions(){
     b.onclick = function(){
       var m = S.daily.missions[+b.dataset.claim];
       if (m.claimed || (S.daily.counts[m.key]||0) < m.target) return;
-      m.claimed = true; S.coins += m.rc; addXp(m.rx);
+      m.claimed = true; addCoins(m.rc); addXp(m.rx);
       toast(tr("📋 Misi selesai · +", "📋 Mission complete · +") + fmt(m.rc) + " 🪙"); haptic("success"); save(); renderAll();
     };
   });
@@ -1014,11 +1219,70 @@ function renderMissions(){
   badge.style.display = claimable ? "flex" : "none"; badge.textContent = claimable;
 }
 
+/* ================= RENDER: PREMIUM PASS (GRAM ASLI VIA TON CONNECT) ================= */
+function renderPremium(){
+  var boxes = document.querySelectorAll(".premium-content");
+  if (!boxes.length) return;
+  var active = premiumActive();
+  var days = premiumDaysLeft();
+  var canClaim = active && S.premiumLastClaim !== todayStr();
+  var expTxt = "";
+  if (active) {
+    var d = new Date(S.premiumUntil);
+    expTxt = d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0");
+  }
+  var premiumHtml =
+    '<div class="row-between"><h2>👑 Premium Pass</h2><span class="sim-badge" style="background:#7a4fd0">' + tr("Gram Asli · TON Connect", "Real Gram · TON Connect") + '</span></div>' +
+    '<div class="row" style="margin:6px 0 2px"><span class="premium-status' + (active ? " on" : "") + '">' +
+      (active ? ("✅ " + tr("Aktif", "Active") + " · " + tr("Sisa ", " ") + days + tr(" hari", " days left") + " · " + tr("sampai ", "until ") + expTxt)
+              : ("💤 " + tr("Tidak aktif", "Not active"))) + '</span></div>' +
+    '<p class="small" style="margin-top:8px"><b>' + tr("Harga: ", "Price: ") + fmtGram(PREMIUM_PRICE_GRAM) + ' Gram</b> · ' + tr("Durasi ", "Duration ") + PREMIUM_DAYS + tr(" hari", " days") +
+      ' · <span class="muted">' + tr("dibayar dengan Gram asli dari dompet TON kamu lewat TON Connect.", "paid with real Gram from your TON wallet via TON Connect.") + '</span></p>' +
+    '<ul class="premium-benefits small">' +
+      '<li>🌾 ' + tr("Hasil panen 2× — koin dari menjual hasil panen & produk ternak jadi 2× lipat", "2× harvest returns — coins from selling crops & animal products are doubled") + '</li>' +
+      '<li>🌱 ' + tr("+1 petak tambahan gratis, di atas batas Balai Kota", "+1 free extra plot, above the Town Hall limit") + '</li>' +
+      '<li>🎁 ' + tr("Hadiah harian ", "Daily reward of ") + fmt(PREMIUM_DAILY_COINS) + tr(" koin, bisa diklaim tiap hari selama pass aktif", " coins, claimable every day while the pass is active") + '</li>' +
+    '</ul>' +
+    '<div class="row">' +
+      (active
+        ? '<button class="btn-amber grow" disabled>👑 ' + tr("Pass Sedang Aktif", "Pass Is Active") + '</button>'
+        : '<button class="btn-amber grow js-buy-premium">' + tr("Beli Premium Pass · ", "Buy Premium Pass · ") + fmtGram(PREMIUM_PRICE_GRAM) + ' Gram (TON Connect)</button>') +
+    '</div>' +
+    (active ? '' : '<p class="tiny muted" style="margin-top:6px">' + tr("Belum punya dompet terhubung? Hubungkan dulu di tab 💎 Gram.", "No wallet connected yet? Connect one first in the 💎 Gram tab.") + '</p>') +
+    (active ? '<div class="row" style="margin-top:8px"><button class="btn-green grow js-claim-premium"' + (canClaim ? "" : " disabled") + '>🎁 ' +
+      (canClaim ? (tr("Klaim Hadiah Harian · ", "Claim Daily Reward · ") + fmt(PREMIUM_DAILY_COINS) + " 🪙")
+                : tr("Hadiah Harian Sudah Diklaim Hari Ini ✓", "Today's Daily Reward Already Claimed ✓")) + '</button></div>' : '');
+  boxes.forEach(function(box){ box.innerHTML = premiumHtml; });
+  document.querySelectorAll(".js-buy-premium").forEach(function(buyBtn){
+    buyBtn.onclick = function(){
+      if (premiumActive()) return;
+      /* Pembayaran Gram asli lewat TON Connect ke dompet pemilik;
+         pass aktif setelah pemain mengonfirmasi di dompetnya. */
+      payWithTon(PREMIUM_PRICE_GRAM, function(){
+        S.premiumUntil = nowMs() + PREMIUM_DAYS * 24 * 60 * 60 * 1000;
+        ensurePlots();
+        toast(tr("👑 Premium Pass aktif · ", "👑 Premium Pass active · ") + PREMIUM_DAYS + tr(" hari!", " days!")); haptic("success");
+        save(); renderAll();
+      });
+    };
+  });
+  document.querySelectorAll(".js-claim-premium").forEach(function(claimBtn){
+    claimBtn.onclick = function(){
+      if (!premiumActive()) return;
+      if (S.premiumLastClaim === todayStr()) { toast(tr("Hadiah harian sudah diklaim hari ini", "Today's daily reward has already been claimed")); haptic("error"); return; }
+      S.premiumLastClaim = todayStr();
+      addCoins(PREMIUM_DAILY_COINS);
+      toast("🎁 +" + fmt(PREMIUM_DAILY_COINS) + tr(" 🪙 hadiah harian Premium Pass", " 🪙 Premium Pass daily reward")); haptic("success");
+      save(); renderAll();
+    };
+  });
+}
+
 /* ================= RENDER: GRAM & TOKO ================= */
 function renderGram(){
+  renderPremium();
   $("gram-bal").textContent = fmtGram(S.gram);
-  $("wallet-addr").textContent = S.wallet ? tr("EQ…Simulasi", "EQ…Simulation") : tr("Belum terhubung", "Not connected");
-  $("btn-wallet").textContent = S.wallet ? tr("Dompet Terhubung (Simulasi) ✓", "Wallet Connected (Simulation) ✓") : tr("Hubungkan Dompet (Simulasi)", "Connect Wallet (Simulation)");
+  renderTonWallet();
   var hist = $("wd-history");
   if (S.withdrawals.length) {
     hist.innerHTML = '<div class="divider"></div><h3>' + tr("Riwayat Penarikan (Simulasi)", "Withdrawal History (Simulation)") + '</h3>' + S.withdrawals.slice().reverse().map(function(w){
@@ -1033,17 +1297,26 @@ function renderGram(){
     d.innerHTML = '<div class="row-between"><b>' + shopName(it) + '</b><span>' + priceHtml + '</span></div>' +
       '<p class="small muted">' + shopDesc(it) + '</p><div class="row">' +
       (it.coins ? '<button class="btn-small btn-green" data-buy="coins" data-id="' + it.id + '">' + tr("Beli dengan Koin", "Buy with Coins") + '</button>' : '') +
-      '<button class="btn-small btn-amber" data-buy="gram" data-id="' + it.id + '">' + tr("Beli dengan Gram", "Buy with Gram") + '</button></div>';
+      '<button class="btn-small btn-amber" data-buy="gram" data-id="' + it.id + '">' + tr("Beli dengan Gram Asli (TON Connect)", "Buy with Real Gram (TON Connect)") + '</button></div>';
     shop.appendChild(d);
   });
   shop.querySelectorAll("button[data-buy]").forEach(function(b){
     b.onclick = function(){
       var it = SHOP.find(function(x){ return x.id === b.dataset.id; });
-      if (b.dataset.buy === "coins") { if (!spendCoins(it.coins)) { renderStatus(); return; } }
-      else { if (S.gram < it.gram) { toast(tr("💎 Gram tidak cukup", "💎 Not enough Gram")); haptic("error"); return; } S.gram -= it.gram; }
-      applyShopItem(it);
-      toast("✅ " + shopName(it).replace(/^\S+ /, "") + tr(" berhasil dibeli", " purchased successfully")); haptic("success");
-      save(); renderAll();
+      if (b.dataset.buy === "coins") {
+        if (!spendCoins(it.coins)) { renderStatus(); return; }
+        applyShopItem(it);
+        toast("✅ " + shopName(it).replace(/^\S+ /, "") + tr(" berhasil dibeli", " purchased successfully")); haptic("success");
+        save(); renderAll();
+      } else {
+        /* Pembayaran Gram asli lewat TON Connect ke dompet pemilik;
+           item diberikan setelah pemain mengonfirmasi di dompetnya. */
+        payWithTon(it.gram, function(){
+          applyShopItem(it);
+          toast("✅ " + shopName(it).replace(/^\S+ /, "") + tr(" berhasil dibeli", " purchased successfully")); haptic("success");
+          save(); renderAll();
+        });
+      }
     };
   });
 }
@@ -1085,7 +1358,7 @@ function renderFriends(){
       var m = MILESTONES[+b.dataset.mile];
       if (S.friends.length < m.n || S.milesClaimed.indexOf(+b.dataset.mile) >= 0) return;
       S.milesClaimed.push(+b.dataset.mile);
-      S.coins += m.rc; S.gram += m.rg; addXp(m.rx);
+      addCoins(m.rc); S.gram += m.rg; addXp(m.rx);
       toast(tr("🏆 Tonggak " + m.n + " teman diklaim!", "🏆 " + m.n + "-friend milestone claimed!")); haptic("success"); save(); renderAll();
     };
   });
@@ -1100,6 +1373,7 @@ function renderFriends(){
 /* ================= RENDER SEMUA ================= */
 function renderAll(){
   ensureDaily();
+  ensurePlots();
   S.animals.forEach(settleAnimal);
   renderStatus(); renderTH(); renderSeeds(); renderPlots(); renderPens();
   renderMarket(); renderMissions(); renderGram(); renderFriends();
@@ -1107,7 +1381,7 @@ function renderAll(){
 /* render ringan tiap detik: hanya hitung mundur & status */
 function tickRender(){
   S.animals.forEach(settleAnimal);
-  renderStatus(); renderPlots(); renderPens(); renderMissions(); renderFriends();
+  renderStatus(); renderTH(); renderPlots(); renderPens(); renderMissions(); renderFriends(); renderPremium();
 }
 </script>
 
@@ -1115,12 +1389,12 @@ function tickRender(){
 "use strict";
 /* ================= IKAT TOMBOL & INIT ================= */
 function switchTab(name){
-  document.querySelectorAll(".tabbar button").forEach(function(b){ b.classList.toggle("active", b.dataset.tab === name); });
+  document.querySelectorAll("button[data-tab]").forEach(function(b){ b.classList.toggle("active", b.dataset.tab === name); });
   document.querySelectorAll(".tabpage").forEach(function(p){ p.classList.remove("active"); });
   var pg = $("page-" + name); if (pg) pg.classList.add("active");
   window.scrollTo({ top: 0 });
 }
-document.querySelectorAll(".tabbar button").forEach(function(b){
+document.querySelectorAll("button[data-tab]").forEach(function(b){
   b.addEventListener("click", function(){ haptic(); switchTab(b.dataset.tab); });
 });
 
@@ -1144,20 +1418,17 @@ $("btn-upgrade-th").addEventListener("click", function(){
 $("btn-sell-all").addEventListener("click", function(){
   var total = 0, count = 0;
   Object.keys(S.inv).forEach(function(id){
-    var n = S.inv[id] || 0; if (n > 0) { total += itemInfo(id).sell * n; count += n; S.inv[id] = 0; }
+    var n = S.inv[id] || 0; if (n > 0) { total += itemInfo(id).sell * sellMultiplier() * n; count += n; S.inv[id] = 0; }
   });
   if (!count) { toast(tr("Gudang kosong", "Storage is empty")); haptic("error"); return; }
-  S.coins += total; track("sell", count); addXp(count);
+  addCoins(total); track("sell", count); addXp(count);
   toast(tr("🏪 Semua terjual · +", "🏪 Everything sold · +") + fmt(total) + " 🪙"); haptic("success");
   save(); renderAll();
 });
 
-/* Gram */
-$("btn-wallet").addEventListener("click", function(){
-  S.wallet = !S.wallet;
-  toast(S.wallet ? tr("👛 Dompet simulasi terhubung", "👛 Simulation wallet connected") : tr("👛 Dompet diputuskan", "👛 Wallet disconnected"));
-  haptic(); save(); renderGram();
-});
+/* Gram — dompet TON asli lewat TON Connect */
+$("btn-ton-connect").addEventListener("click", function(){ haptic(); tonConnectWallet(); });
+$("btn-ton-disconnect").addEventListener("click", function(){ tonDisconnectWallet(); });
 $("ex-input").addEventListener("input", renderExPreview);
 $("btn-exchange").addEventListener("click", function(){
   var v = Math.floor(parseFloat($("ex-input").value) || 0);
@@ -1171,7 +1442,7 @@ $("btn-exchange").addEventListener("click", function(){
 });
 $("btn-withdraw").addEventListener("click", function(){
   if (S.th < 4) { toast(tr("🔒 Butuh Balai Kota Level 4", "🔒 Requires Town Hall Level 4")); haptic("error"); return; }
-  if (!S.wallet) { toast(tr("Hubungkan dompet simulasi dulu", "Connect the simulation wallet first")); haptic("error"); return; }
+  if (!tonConnected()) { toast(tr("Hubungkan dompet TON dulu lewat TON Connect", "Connect your TON wallet via TON Connect first")); haptic("error"); return; }
   var v = parseFloat($("wd-input").value) || 0;
   if (v < 0.5) { toast(tr("Minimal tarik 0,5 Gram", "Minimum withdrawal is 0.5 Gram")); haptic("error"); return; }
   if (S.gram < v) { toast(tr("💎 Gram tidak cukup", "💎 Not enough Gram")); haptic("error"); return; }
@@ -1211,7 +1482,7 @@ $("btn-add-friend").addEventListener("click", function(){
   var name = $("friend-name").value.trim();
   if (!name) { toast(tr("Isi nama teman dulu", "Enter your friend's name first")); haptic("error"); return; }
   S.friends.push({ name: name, date: todayStr() });
-  S.coins += 100; addXp(10);
+  addCoins(100); addXp(10);
   $("friend-name").value = "";
   toast("👥 " + name + tr(" bergabung", " joined") + " · +100 🪙 +10 XP"); haptic("success");
   save(); renderAll();
@@ -1221,7 +1492,7 @@ $("btn-redeem").addEventListener("click", function(){
   if (S.redeemed) { toast(tr("Bonus sambutan sudah pernah ditukar", "The welcome bonus has already been redeemed")); haptic("error"); return; }
   if (!/^FARM-[A-Z0-9]{6}$/.test(code)) { toast(tr("Format kode: FARM-XXXXXX", "Code format: FARM-XXXXXX")); haptic("error"); return; }
   if (code === S.inviteCode) { toast(tr("Tidak bisa memakai kode sendiri", "You can't use your own code")); haptic("error"); return; }
-  S.redeemed = true; S.coins += 150; addXp(25);
+  S.redeemed = true; addCoins(150); addXp(25);
   toast(tr("🎁 Bonus sambutan · +150 🪙 +25 XP", "🎁 Welcome bonus · +150 🪙 +25 XP")); haptic("success");
   $("redeem-input").value = "";
   save(); renderAll();
@@ -1269,10 +1540,15 @@ function applyStaticTexts(){
   set("inv-total-label", tr("Total nilai gudang", "Total storage value"));
   set("mission-title", tr("📋 Misi Harian", "📋 Daily Missions"));
   set("mission-desc", tr("Misi diperbarui setiap hari. Selesaikan dan klaim hadiahnya.", "Missions refresh every day. Complete them and claim the rewards."));
-  set("wallet-title", tr("👛 Dompet Gram (Simulasi)", "👛 Gram Wallet (Simulation)"));
-  set("gram-bal-label", tr("Saldo Gram", "Gram Balance"));
-  set("wallet-addr-label", tr("Alamat", "Address"));
-  set("wallet-note", tr("Ini simulasi di dalam game — tidak ada Gram asli yang bergerak dan tidak ada dompet asli yang terhubung.", "This is an in-game simulation — no real Gram moves and no real wallet is connected."));
+  set("wallet-title", tr("👛 Dompet Gram", "👛 Gram Wallet"));
+  set("gram-bal-label", tr("Saldo Gram (dalam game)", "Gram Balance (in-game)"));
+  set("gram-bal-note", tr("Saldo ini berasal dari tukar koin & hadiah di dalam game.", "This balance comes from exchanging coins & in-game rewards."));
+  set("ton-title", tr("💎 Dompet TON Asli — TON Connect", "💎 Real TON Wallet — TON Connect"));
+  set("wallet-addr-label", tr("Alamat dompet TON kamu", "Your TON wallet address"));
+  set("btn-ton-connect", tr("Hubungkan Dompet", "Connect Wallet"));
+  set("btn-ton-disconnect", tr("Putuskan", "Disconnect"));
+  set("wallet-note", tr("Hubungkan dompet TON asli kamu (Tonkeeper, Wallet di Telegram, MyTonWallet) lewat TON Connect untuk membayar Premium Pass & item Toko Premium dengan Gram asli.", "Connect your real TON wallet (Tonkeeper, Telegram Wallet, MyTonWallet) via TON Connect to pay for the Premium Pass & Premium Shop items with real Gram."));
+  set("ton-verify-note", tr("⚠️ Pembayaran Gram asli sudah bisa dicoba lewat TON Connect, tetapi verifikasi di server belum ada — jadi pemberian item setelah pembayaran masih mengandalkan konfirmasi dari dompetmu di perangkat ini, belum diverifikasi di blockchain oleh server.", "⚠️ Real Gram payments can now be tried via TON Connect, but there is no server verification yet — items are granted based on your wallet's confirmation on this device, not yet verified on the blockchain by a server."));
   set("ex-title", tr("🔄 Tukar Koin → Gram", "🔄 Exchange Coins → Gram"));
   setH("ex-rate", tr("Kurs: <b>10.000 🪙 = 0,01 Gram</b> · Minimal tukar 10.000 🪙", "Rate: <b>10,000 🪙 = 0.01 Gram</b> · Minimum exchange 10,000 🪙"));
   set("btn-exchange", tr("Tukar", "Exchange"));
@@ -1305,8 +1581,8 @@ function applyStaticTexts(){
   set("reset-desc", tr("Semua progres (koin, kebun, ternak, Gram, undangan) di perangkat ini akan dihapus dan mulai dari awal. Tindakan ini tidak bisa dibatalkan.", "All progress (coins, garden, livestock, Gram, invites) on this device will be deleted and started over. This cannot be undone."));
   set("btn-reset-cancel", tr("Batal", "Cancel"));
   set("btn-reset-ok", tr("Ya, Mulai Ulang", "Yes, Restart"));
-  var tabNames = { kebun: tr("Kebun", "Garden"), ternak: tr("Ternak", "Livestock"), pasar: tr("Pasar", "Market"), misi: tr("Misi", "Missions"), gram: "Gram", teman: tr("Teman", "Friends") };
-  document.querySelectorAll(".tabbar button").forEach(function(b){
+  var tabNames = { kebun: tr("Kebun", "Garden"), ternak: tr("Ternak", "Livestock"), pasar: tr("Pasar", "Market"), misi: tr("Misi", "Missions"), gram: "Gram", premium: "Premium", teman: tr("Teman", "Friends") };
+  document.querySelectorAll("button[data-tab]").forEach(function(b){
     var s = b.querySelector(".tab-label"); if (s && tabNames[b.dataset.tab]) s.textContent = tabNames[b.dataset.tab];
   });
 }
@@ -1314,12 +1590,24 @@ function applyStaticTexts(){
 loadState();
 applyStaticTexts();
 ensureDaily();
-/* normalisasi petak */
+/* normalisasi petak (termasuk +1 petak Premium Pass bila aktif) */
+if (S.lb) delete S.lb; /* bersihkan data leaderboard lama dari save */
+if (typeof S.premiumUntil !== "number") S.premiumUntil = 0;
+if (typeof S.premiumLastClaim !== "string") S.premiumLastClaim = "";
 while (S.plots.length < S.plotsOwned) S.plots.push(null);
-S.plots.length = S.plotsOwned;
+ensurePlots();
 S.animals.forEach(settleAnimal);
 renderAll();
 renderExPreview();
+/* TON Connect: pulihkan koneksi dompet TON asli dari sesi sebelumnya.
+   Save lama bisa berisi wallet simulasi — sinkronkan ulang ke status asli. */
+initTonConnect();
+if (tonConnectUI && tonConnectUI.connectionRestored && tonConnectUI.connectionRestored.then) {
+  tonConnectUI.connectionRestored.then(function(){
+    if (!tonConnected() && S.wallet) { S.wallet = false; save(); }
+    renderTonWallet();
+  }).catch(function(){});
+}
 if (S.musicOn) {
   /* musik butuh interaksi pertama di browser/Telegram */
   var kick = function(){ startMusic(); document.removeEventListener("pointerdown", kick); };
