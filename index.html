@@ -570,20 +570,12 @@
       <section class="tabpage" id="page-teman">
         <div class="card">
           <h2 id="invite-title">👥 Undang Teman</h2>
-          <p class="small" id="invite-desc">Bagikan kode undanganmu. Setiap teman yang bergabung memberimu <b>+100 🪙 +5 XP</b>.</p>
+          <p class="small" id="invite-desc">Bagikan kode undanganmu ke teman-temanmu.</p>
           <div style="text-align:center;margin:12px 0"><code class="code" id="my-code">FARM-??????</code></div>
           <div class="row">
             <button class="btn-green grow" id="btn-copy-code">Salin Kode</button>
             <button class="grow" id="btn-copy-msg">Salin Pesan Undangan</button>
           </div>
-          <div class="divider"></div>
-          <h3 id="friend-heading">Teman yang bergabung pakai kodemu</h3>
-          <div class="row">
-            <input id="friend-name" placeholder="Nama teman yang bergabung" class="grow" />
-            <button class="btn-amber" id="btn-add-friend">Catat Teman</button>
-          </div>
-          <p class="small muted" style="margin-top:6px"><span id="friend-joined-label">Sudah bergabung:</span> <b id="friend-count">0</b> <span id="friend-joined-unit">teman</span></p>
-          <div id="friend-list"></div>
         </div>
 
         <div class="card">
@@ -630,6 +622,13 @@
    bergabung +5 XP, bonus sambutan +12,5 XP. Batas XP naik Level Petani
    (xpForLevel) TIDAK berubah — pemain naik level 2x lebih lambat.
    Saldo XP pemain yang sudah tersimpan tidak diubah. */
+/* CATAT TEMAN DIHAPUS (21 Nov 2026, atas permintaan pemilik): fitur
+   mencatat teman secara manual (input nama + tombol "Catat Teman",
+   +100 🪙 +5 XP per nama) dihapus karena bisa dipalsukan tanpa batas
+   untuk membuka tonggak undangan & Gram. Kode undangan, salin pesan,
+   tonggak (berdasarkan catatan lama yang sudah tersimpan), dan tukar
+   kode sambutan tetap ada; jumlah teman tersimpan tidak lagi bisa
+   bertambah. */
 var CROPS = [
   {id:"wortel",   name:"Wortel", nameEn:"Carrot",   em:"🥕", seed:10, sell:18,  grow:10*60, xp:1.5,  thReq:1},
   {id:"kentang",  name:"Kentang", nameEn:"Potato",  em:"🥔", seed:15, sell:28,  grow:15*60, xp:2,  thReq:1},
@@ -2441,9 +2440,6 @@ function inviteMessage(){
 }
 function renderFriends(){
   $("my-code").textContent = S.inviteCode;
-  $("friend-count").textContent = S.friends.length;
-  var fl = $("friend-list");
-  fl.innerHTML = S.friends.length ? S.friends.map(function(f){ return '<div class="hist-row"><span>👤 ' + esc(f.name) + '</span><span class="muted">' + f.date + '</span><span>+100 🪙 +5 XP</span></div>'; }).join("") : "";
   var ml = $("mile-list"); ml.innerHTML = "";
   var claimable = 0;
   MILESTONES.forEach(function(m, i){
@@ -2678,15 +2674,6 @@ function fallbackCopy(txt){
 }
 $("btn-copy-code").addEventListener("click", function(){ copyText(S.inviteCode, tr("📋 Kode undangan disalin: ", "📋 Invite code copied: ") + S.inviteCode); });
 $("btn-copy-msg").addEventListener("click", function(){ copyText(inviteMessage(), tr("📋 Pesan undangan disalin", "📋 Invite message copied")); });
-$("btn-add-friend").addEventListener("click", function(){
-  var name = $("friend-name").value.trim();
-  if (!name) { toast(tr("Isi nama teman dulu", "Enter your friend's name first")); haptic("error"); return; }
-  S.friends.push({ name: name, date: todayStr() });
-  addCoins(100); addXp(5);
-  $("friend-name").value = "";
-  toast("👥 " + name + tr(" bergabung", " joined") + " · +100 🪙 +5 XP"); haptic("success");
-  save(); renderAll();
-});
 $("btn-redeem").addEventListener("click", function(){
   var code = $("redeem-input").value.trim().toUpperCase();
   if (S.redeemed) { toast(tr("Bonus sambutan sudah pernah ditukar", "The welcome bonus has already been redeemed")); haptic("error"); return; }
@@ -2759,14 +2746,9 @@ function applyStaticTexts(){
   set("wd-cancel-note", tr("Penarikan tidak bisa dibatalkan setelah 10 menit.", "Withdrawals cannot be cancelled after 10 minutes."));
   set("shop-title", tr("💎 Toko Premium", "💎 Premium Shop"));
   set("invite-title", tr("👥 Undang Teman", "👥 Invite Friends"));
-  setH("invite-desc", tr("Bagikan kode undanganmu. Setiap teman yang bergabung memberimu <b>+100 🪙 +5 XP</b>.", "Share your invite code. Every friend who joins gives you <b>+100 🪙 +5 XP</b>."));
+  set("invite-desc", tr("Bagikan kode undanganmu ke teman-temanmu.", "Share your invite code with your friends."));
   set("btn-copy-code", tr("Salin Kode", "Copy Code"));
   set("btn-copy-msg", tr("Salin Pesan Undangan", "Copy Invite Message"));
-  set("friend-heading", tr("Teman yang bergabung pakai kodemu", "Friends who joined with your code"));
-  setPh("friend-name", tr("Nama teman yang bergabung", "Name of the friend who joined"));
-  set("btn-add-friend", tr("Catat Teman", "Add Friend"));
-  set("friend-joined-label", tr("Sudah bergabung:", "Joined:"));
-  set("friend-joined-unit", tr("teman", "friends"));
   set("mile-title", tr("🏆 Tonggak Undangan", "🏆 Invite Milestones"));
   setH("mile-desc", tr("Total hadiah Gram dari semua tonggak maksimal <b>0,08 Gram</b>.", "The total Gram reward from all milestones is at most <b>0.08 Gram</b>."));
   set("redeem-title", tr("🎁 Punya Kode Teman?", "🎁 Have a Friend's Code?"));
