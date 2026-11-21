@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
     <meta name="color-scheme" content="light dark" />
     <link rel="icon" href="data:," />
-    <title>Farming Season Mini App</title>
+    <title>Farm Simulator</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="https://unpkg.com/@tonconnect/ui@latest/dist/tonconnect-ui.min.js"></script>
     <style>
@@ -311,7 +311,7 @@
     <div class="statusbar">
       <div class="statusbar-in">
         <div class="sb-row">
-          <span class="sb-title">🌾 Farming Season</span>
+          <span class="sb-title">🌾 Farm Simulator</span>
           <button type="button" class="pill pill-coins" id="sb-coins-btn" title="Beli koin" aria-label="Beli koin">🪙 <span id="sb-coins">0</span></button>
           <span class="pill gram">💎 <span id="sb-gram">0</span></span>
           <button class="icon-btn" id="btn-music" title="Musik latar">🔇</button>
@@ -557,7 +557,7 @@ var ANIMALS = {
   domba: {name:"Domba", nameEn:"Sheep", em:"🐑", buy:300, sellBack:150, thReq:3, cycle:15*60, feed:35, product:"wol",   pem:"🧶", pname:"Wol", pnameEn:"Wool",   psell:20, sound:"Mbeeek!", soundEn:"Baaa!"}
 };
 var TH_MAXPLOTS = [3,6,9,12,15];
-var TH_UPGRADE  = [0,20000,30000,40000,50000]; /* index = level tujuan */
+var TH_UPGRADE  = [0,20000,30000,80000,100000]; /* index = level saat ini; biaya naik KE level berikutnya: Lv2=20rb, Lv3=30rb, Lv4=80rb, Lv5=100rb (Lv 4 & 5 dinaikkan 21 Nov 2026) */
 /* Syarat level petani untuk naik KE level Town Hall tsb (index = level
    tujuan, sejajar TH_UPGRADE): TH 2→Petani Lv 2, TH 3→Lv 4, TH 4→Lv 6,
    TH 5→Lv 9. Ditampilkan sebagai info di kartu & halaman Balai Kota. */
@@ -1503,8 +1503,12 @@ function renderBalaiKota(){
       var crops = CROPS.filter(function(c){ return (c.thReq || 1) === L; });
       var animals = Object.keys(ANIMALS).filter(function(k){ return ANIMALS[k].thReq === L; });
       var badge = L === S.th ? " · <b>" + tr("level kamu", "your level") + "</b>" : (L < S.th ? " ✓" : " 🔒");
+      var priceLine = L === 1
+        ? '<p class="small">💰 ' + tr("Harga: ", "Price: ") + "<b>" + tr("Level awal — gratis", "Starting level — free") + "</b></p>"
+        : '<p class="small">💰 ' + tr("Harga upgrade: ", "Upgrade price: ") + '<b class="price-tag">' + fmt(TH_UPGRADE[L-1]) + " 🪙</b></p>";
       html += '<div class="bk-row' + (L === S.th ? " cur" : (L > S.th ? " locked" : "")) + '">' +
         "<b>🏛️ " + tr("Level ", "Level ") + L + "</b>" + badge +
+        priceLine +
         '<p class="small">🌱 ' + tr("Petak maks: ", "Max plots: ") + "<b>" + TH_MAXPLOTS[L-1] + "</b></p>" +
         '<p class="small">🌾 ' + tr("Tanaman: ", "Crops: ") + (crops.length ? crops.map(function(c){ return c.em + " " + cName(c); }).join(", ") : "—") + "</p>" +
         '<p class="small">🐾 ' + tr("Hewan: ", "Animals: ") + (animals.length ? animals.map(function(k){ return ANIMALS[k].em + " " + aName(ANIMALS[k]); }).join(", ") : "—") + "</p>" +
@@ -2078,7 +2082,7 @@ function wdStatusInfo(w){
   return { cls: "wait", label: tr("⏳ Menunggu", "⏳ Pending") };
 }
 function withdrawalRequestText(w){
-  return "🏧 " + tr("Permintaan Tarik Gram — Farming Season", "Gram Withdrawal Request — Farming Season") + "\n" +
+  return "🏧 " + tr("Permintaan Tarik Gram — Farm Simulator", "Gram Withdrawal Request — Farm Simulator") + "\n" +
     tr("Jumlah: ", "Amount: ") + fmtGram(w.amount) + " Gram\n" +
     tr("Alamat dompet TON: ", "TON wallet address: ") + w.wallet + "\n" +
     tr("Tanggal: ", "Date: ") + w.date + "\n" +
@@ -2195,7 +2199,7 @@ function renderExPreview(){
 
 /* ================= RENDER: TEMAN ================= */
 function inviteMessage(){
-  return tr("🌾 Ayo main Farming Season bareng aku! Tanam, panen, pelihara ternak, dan kumpulkan koin. Pakai kode undanganku ", "🌾 Come play Farming Season with me! Plant, harvest, raise livestock, and collect coins. Use my invite code ") + S.inviteCode + tr(" saat mulai supaya dapat bonus sambutan +150 🪙 +25 XP. Selamat bertani!", " when you start to get a welcome bonus of +150 🪙 +25 XP. Happy farming!");
+  return tr("🌾 Ayo main Farm Simulator bareng aku! Tanam, panen, pelihara ternak, dan kumpulkan koin. Pakai kode undanganku ", "🌾 Come play Farm Simulator with me! Plant, harvest, raise livestock, and collect coins. Use my invite code ") + S.inviteCode + tr(" saat mulai supaya dapat bonus sambutan +150 🪙 +25 XP. Selamat bertani!", " when you start to get a welcome bonus of +150 🪙 +25 XP. Happy farming!");
 }
 function renderFriends(){
   $("my-code").textContent = S.inviteCode;
