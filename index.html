@@ -155,16 +155,19 @@
         display:flex;align-items:center;justify-content:center;padding:0 4px}
       /* Tombol atas Premium: terpisah dari tab bar bawah,
          latar emas lembut agar menonjol, tetap terlihat (status bar sticky). */
-      .top-nav{display:flex;gap:6px;margin-top:10px}
-      .top-nav-btn{flex:1 1 0;min-width:0;display:flex;align-items:center;justify-content:center;gap:5px;
-        min-height:44px;border-radius:14px;border:1.5px solid var(--amber);
+      .top-nav{display:flex;gap:5px;margin-top:10px}
+      /* Empat tombol atas harus muat satu baris di layar HP sempit:
+         ikon di atas label (seperti tab bar bawah), huruf lebih kecil,
+         dan label tidak boleh keluar dari tombol. */
+      .top-nav-btn{flex:1 1 0;min-width:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
+        min-height:46px;border-radius:14px;border:1.5px solid var(--amber);
         background:var(--amber-soft);color:var(--ink);
-        font-weight:800;font-size:13.5px;padding:9px 6px;
+        font-weight:800;font-size:11px;padding:6px 2px;overflow:hidden;
         box-shadow:0 3px 8px rgba(160,110,20,.22);
         -webkit-tap-highlight-color:transparent;
         transition:transform .15s ease,background .15s ease,box-shadow .15s ease}
-      .top-nav-btn .tic{font-size:19px;line-height:1}
-      .top-nav-btn .tab-label{white-space:nowrap}
+      .top-nav-btn .tic{font-size:17px;line-height:1.1}
+      .top-nav-btn .tab-label{white-space:nowrap;max-width:100%;overflow:hidden;text-overflow:ellipsis}
       .top-nav-btn:active{transform:scale(.97)}
       .top-nav-btn.active{background:linear-gradient(150deg,var(--amber),#ffd968);color:#3a2a08;
         border-color:#c07f22;box-shadow:0 5px 12px rgba(160,110,20,.42)}
@@ -344,6 +347,7 @@
           <button class="top-nav-btn" data-tab="premium" id="top-btn-premium"><span class="tic">👑</span><span class="tab-label">Premium</span></button>
           <button class="top-nav-btn" data-tab="balaikota" id="top-btn-balaikota"><span class="tic">🏛️</span><span class="tab-label">Balai Kota</span></button>
           <button class="top-nav-btn" data-tab="inventaris" id="top-btn-inventaris"><span class="tic">🎒</span><span class="tab-label">Inventaris</span></button>
+          <button class="top-nav-btn" data-tab="toko" id="top-btn-toko"><span class="tic">🛍️</span><span class="tab-label">Toko</span></button>
         </div>
       </div>
     </div>
@@ -466,10 +470,6 @@
           <div id="wd-history"></div>
         </div>
 
-        <div class="card" id="shop-card">
-          <h2 id="shop-title">💎 Toko Premium</h2>
-          <div id="shop-list"></div>
-        </div>
       </section>
 
       <!-- PREMIUM -->
@@ -566,6 +566,18 @@
         </div>
       </section>
 
+      <!-- TOKO -->
+      <section class="tabpage" id="page-toko">
+        <div class="card" id="shop-card">
+          <h2 id="shop-title">💎 Toko Premium</h2>
+          <p class="small muted" id="toko-desc">Paket koin &amp; item premium — bayar dengan Gram lewat dompet TON, atau dengan koin untuk item tertentu.</p>
+          <div id="shop-list"></div>
+          <div class="divider"></div>
+          <button id="btn-toko-wallet" style="width:100%">👛 Ke Dompet — Hubungkan Dompet TON</button>
+          <p class="tiny muted" style="margin-top:6px" id="toko-wallet-note">Pembayaran dengan Gram memakai dompet TON yang terhubung di tab Dompet.</p>
+        </div>
+      </section>
+
       <!-- TEMAN -->
       <section class="tabpage" id="page-teman">
         <div class="card">
@@ -583,6 +595,9 @@
           <p class="small muted" id="mile-desc">Total hadiah Gram dari semua tonggak maksimal <b>0,08 Gram</b>.</p>
           <div id="mile-list"></div>
         </div>
+
+        <!-- Penghitung kunjungan (hanya untuk pemilik): badge dimuat tersembunyi setiap game dibuka supaya hitungan tetap berjalan; angka dicek pemilik lewat link badge langsung, tidak ditampilkan ke pemain. -->
+        <img src="https://komarev.com/ghpvc/?username=kizurakorea-collab" alt="" aria-hidden="true" style="display:none" width="1" height="1" />
 
         <div class="card">
           <h2 id="redeem-title">🎁 Punya Kode Teman?</h2>
@@ -799,7 +814,7 @@ function tonDisconnectWallet(){
    dan transaksi terkirim dari perangkat ini (belum ada verifikasi server). */
 function payWithTon(amountGram, onSuccess){
   if (!tonConnected()) {
-    toast(tr("👛 Hubungkan dompet TON dulu lewat tombol Hubungkan Dompet di tab Gram", "👛 Connect your TON wallet first with the Connect Wallet button in the Gram tab"));
+    toast(tr("👛 Hubungkan dompet TON dulu lewat tombol Hubungkan Dompet di tab Dompet", "👛 Connect your TON wallet first with the Connect Wallet button in the Wallet tab"));
     haptic("error");
     return;
   }
@@ -1112,29 +1127,59 @@ function ensurePlots(){
 /* ================= AUDIO: MUSIK + SUARA HEWAN ================= */
 var AC = null;
 function audioCtx(){ if (!AC) { try { AC = new (window.AudioContext||window.webkitAudioContext)(); } catch(e){} } if (AC && AC.state==="suspended") AC.resume(); return AC; }
-/* Melodi taman lembut di G mayor: G–C–G–D–Em–C–G–D, pelan */
-var CHORDS = [
-  [196.00,246.94,293.66],[130.81,164.81,196.00],[196.00,246.94,293.66],[146.83,220.00,293.66],
-  [164.81,196.00,246.94],[130.81,164.81,196.00],[196.00,246.94,293.66],[146.83,220.00,293.66]
+/* Musik latar ceria & semangat di C mayor: melodi riang yang melonjak-lonjak,
+   bass berjalan dan akor pendek, tempo 120 BPM (nada 1/8 = 0,25 detik).
+   Pola 32 langkah (4 birama: C – F – C – G) berputar terus.
+   Tombol 🎵/🔇 ada di status bar; pilihan pemain tersimpan di S.musicOn. */
+var FREQ = {
+  C3:130.81, F3:174.61, G3:196.00,
+  C4:261.63, D4:293.66, E4:329.63, F4:349.23, G4:392.00, A4:440.00, B4:493.88,
+  C5:523.25, D5:587.33, E5:659.25, F5:698.46, G5:783.99, A5:880.00
+};
+var MELODY = [
+  "C5","E5","G5","E5", "C5","E5","G5","E5",
+  "A5","G5","F5","A5", "G5","E5","C5","E5",
+  "D5","E5","G5","E5", "D5","C5","D5","E5",
+  "D5","B4","G4","B4", "C5",null,"E5","G5"
 ];
-var musicTimer = null, chordIdx = 0;
-function playChord(freqs){
+var BASSLINE = [
+  "C3",null,"G3",null, "C3",null,"G3",null,
+  "F3",null,"C4",null, "F3",null,"C4",null,
+  "C3",null,"G3",null, "C3",null,"G3",null,
+  "G3",null,"D4",null, "G3",null,"D4",null
+];
+var CHORDLINE = [
+  ["C4","E4","G4"],null,null,null, ["C4","E4","G4"],null,null,null,
+  ["F4","A4","C5"],null,null,null, ["F4","A4","C5"],null,null,null,
+  ["C4","E4","G4"],null,null,null, ["C4","E4","G4"],null,null,null,
+  ["G4","B4","D5"],null,null,null, ["C4","E4","G4"],null,null,null
+];
+var STEP_SEC = 0.25;
+var musicTimer = null, stepIdx = 0;
+function playNote(freq, t, dur, type, vol){
+  var ac = audioCtx(); if (!ac || !freq) return;
+  var o = ac.createOscillator(), g = ac.createGain();
+  o.type = type; o.frequency.value = freq;
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(vol, t + 0.02);
+  g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+  o.connect(g); g.connect(ac.destination);
+  o.start(t); o.stop(t + dur + 0.05);
+}
+function playStep(){
   var ac = audioCtx(); if (!ac) return;
-  var t = ac.currentTime;
-  freqs.forEach(function(f, i){
-    var o = ac.createOscillator(), g = ac.createGain();
-    o.type = "sine"; o.frequency.value = f;
-    g.gain.setValueAtTime(0, t + i*0.45);
-    g.gain.linearRampToValueAtTime(0.055, t + i*0.45 + 0.25);
-    g.gain.exponentialRampToValueAtTime(0.001, t + i*0.45 + 2.6);
-    o.connect(g); g.connect(ac.destination);
-    o.start(t + i*0.45); o.stop(t + i*0.45 + 2.8);
-  });
+  var t = ac.currentTime + 0.03;
+  var i = stepIdx % 32;
+  if (MELODY[i]) playNote(FREQ[MELODY[i]], t, 0.28, "triangle", 0.055);
+  if (BASSLINE[i]) playNote(FREQ[BASSLINE[i]], t, 0.38, "sine", 0.06);
+  var ch = CHORDLINE[i];
+  if (ch) for (var j = 0; j < ch.length; j++) playNote(FREQ[ch[j]], t, 0.44, "triangle", 0.016);
+  stepIdx++;
 }
 function startMusic(){
   if (musicTimer) return;
-  playChord(CHORDS[chordIdx % CHORDS.length]); chordIdx++;
-  musicTimer = setInterval(function(){ playChord(CHORDS[chordIdx % CHORDS.length]); chordIdx++; }, 3400);
+  playStep();
+  musicTimer = setInterval(playStep, STEP_SEC * 1000);
 }
 function stopMusic(){ if (musicTimer) { clearInterval(musicTimer); musicTimer = null; } }
 function animalSound(type){
@@ -2517,11 +2562,11 @@ document.querySelectorAll("button[data-tab]").forEach(function(b){
   b.addEventListener("click", function(){ haptic(); switchTab(b.dataset.tab); });
 });
 /* Saldo koin di bar atas ditekan → langsung membuka pembelian koin:
-   pindah ke tab Gram lalu gulir ke Paket Koin di Toko Premium
+   pindah ke halaman Toko lalu gulir ke Paket Koin di Toko Premium
    (Paket Koin Kecil / Sedang / Besar) dan sorot paket-paket itu
    sebentar. Harga paket & cara pembayaran tidak berubah. */
 function openCoinShop(){
-  switchTab("gram");
+  switchTab("toko");
   setTimeout(function(){
     var target = $("shop-item-paket-kecil") || $("shop-card") || $("shop-title");
     if (target) {
@@ -2576,6 +2621,10 @@ function openCoinShop(){
   }, 60);
 }
 $("sb-coins-btn").addEventListener("click", function(){ haptic(); openCoinShop(); });
+
+/* Tombol di halaman Toko → ke tab Dompet untuk menghubungkan dompet TON
+   (pembayaran Gram di Toko Premium memakai dompet yang terhubung di sana). */
+$("btn-toko-wallet").addEventListener("click", function(){ haptic(); switchTab("gram"); });
 
 $("harvest-alert").addEventListener("click", function(){ haptic(); scrollToFirstReadyPlot(); });
 
@@ -2745,6 +2794,9 @@ function applyStaticTexts(){
   set("btn-withdraw", tr("Ajukan Penarikan", "Request Withdrawal"));
   set("wd-cancel-note", tr("Penarikan tidak bisa dibatalkan setelah 10 menit.", "Withdrawals cannot be cancelled after 10 minutes."));
   set("shop-title", tr("💎 Toko Premium", "💎 Premium Shop"));
+  set("toko-desc", tr("Paket koin & item premium — bayar dengan Gram lewat dompet TON, atau dengan koin untuk item tertentu.", "Coin packs & premium items — pay with Gram via your TON wallet, or with coins for certain items."));
+  set("btn-toko-wallet", tr("👛 Ke Dompet — Hubungkan Dompet TON", "👛 To Wallet — Connect TON Wallet"));
+  set("toko-wallet-note", tr("Pembayaran dengan Gram memakai dompet TON yang terhubung di tab Dompet.", "Gram payments use the TON wallet connected in the Wallet tab."));
   set("invite-title", tr("👥 Undang Teman", "👥 Invite Friends"));
   set("invite-desc", tr("Bagikan kode undanganmu ke teman-temanmu.", "Share your invite code with your friends."));
   set("btn-copy-code", tr("Salin Kode", "Copy Code"));
@@ -2782,7 +2834,7 @@ function applyStaticTexts(){
   set("inv-stone-total-label", tr("Total Batu", "Total Batu"));
   set("inv-go-tambang", tr("⛏️ Ke Tambang", "⛏️ To the Mine"));
   set("inv-go-pasar-3", tr("🏪 Ke Pasar — Jual Batu", "🏪 To the Market — Sell Batu"));
-  var tabNames = { kebun: tr("Kebun", "Garden"), ternak: tr("Ternak", "Livestock"), tambang: tr("Tambang", "Mine"), pasar: tr("Pasar", "Market"), misi: tr("Misi", "Missions"), gram: tr("Dompet", "Wallet"), premium: "Premium", balaikota: tr("Balai Kota", "Town Hall"), inventaris: tr("Inventaris", "Inventory"), teman: tr("Teman", "Friends") };
+  var tabNames = { kebun: tr("Kebun", "Garden"), ternak: tr("Ternak", "Livestock"), tambang: tr("Tambang", "Mine"), pasar: tr("Pasar", "Market"), misi: tr("Misi", "Missions"), gram: tr("Dompet", "Wallet"), premium: "Premium", balaikota: tr("Balai Kota", "Town Hall"), inventaris: tr("Inventaris", "Inventory"), toko: tr("Toko", "Shop"), teman: tr("Teman", "Friends") };
   document.querySelectorAll("button[data-tab]").forEach(function(b){
     var s = b.querySelector(".tab-label"); if (s && tabNames[b.dataset.tab]) s.textContent = tabNames[b.dataset.tab];
   });
