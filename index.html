@@ -155,15 +155,15 @@
         display:flex;align-items:center;justify-content:center;padding:0 4px}
       /* Tombol atas Premium: terpisah dari tab bar bawah,
          latar emas lembut agar menonjol, tetap terlihat (status bar sticky). */
-      .top-nav{display:flex;gap:8px;margin-top:10px}
-      .top-nav-btn{flex:1 1 0;min-width:0;display:flex;align-items:center;justify-content:center;gap:7px;
+      .top-nav{display:flex;gap:6px;margin-top:10px}
+      .top-nav-btn{flex:1 1 0;min-width:0;display:flex;align-items:center;justify-content:center;gap:5px;
         min-height:44px;border-radius:14px;border:1.5px solid var(--amber);
         background:var(--amber-soft);color:var(--ink);
-        font-weight:800;font-size:14.5px;padding:9px 10px;
+        font-weight:800;font-size:13.5px;padding:9px 6px;
         box-shadow:0 3px 8px rgba(160,110,20,.22);
         -webkit-tap-highlight-color:transparent;
         transition:transform .15s ease,background .15s ease,box-shadow .15s ease}
-      .top-nav-btn .tic{font-size:20px;line-height:1}
+      .top-nav-btn .tic{font-size:19px;line-height:1}
       .top-nav-btn .tab-label{white-space:nowrap}
       .top-nav-btn:active{transform:scale(.97)}
       .top-nav-btn.active{background:linear-gradient(150deg,var(--amber),#ffd968);color:#3a2a08;
@@ -284,6 +284,23 @@
       .bk-row.locked{opacity:.72}
       .bk-row p{margin:2px 0}
 
+      /* Halaman Inventaris: semua milik pemain dalam satu tempat —
+         tanaman, hasil ternak, benih, pakan, dan Batu. Ringkasan di
+         atas memakai grid 2 kolom agar angka besar tetap terbaca di
+         layar HP sempit; baris inventaris memakai ulang .inv-row
+         dengan lencana jumlah di kanan. Baris dengan jumlah 0
+         ditampilkan redup supaya yang benar-benar dimiliki menonjol. */
+      .inv-summary-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+      .inv-summary-grid .stat b{font-size:18px}
+      .inv-count{margin-left:auto;flex-shrink:0;background:var(--card);border:1px solid var(--line);
+        border-radius:999px;padding:4px 11px;font-weight:800;font-size:14px;white-space:nowrap}
+      .inv-count.has{background:var(--green-soft);border-color:var(--green);color:var(--green-d)}
+      .inv-row.zero{opacity:.52}
+      .inv-row .grow{min-width:0}
+      .inv-cat-total{display:flex;justify-content:space-between;gap:8px;align-items:center;
+        padding-top:9px;margin-top:2px;font-size:13.5px}
+      .inv-go{width:100%;margin-top:10px}
+
       /* toast & modal */
       #toasts{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(122px + var(--host-badge-clearance));z-index:99;
         display:flex;flex-direction:column;gap:6px;align-items:center;pointer-events:none;width:max-content;max-width:92vw}
@@ -326,6 +343,7 @@
         <div class="top-nav">
           <button class="top-nav-btn" data-tab="premium" id="top-btn-premium"><span class="tic">👑</span><span class="tab-label">Premium</span></button>
           <button class="top-nav-btn" data-tab="balaikota" id="top-btn-balaikota"><span class="tic">🏛️</span><span class="tab-label">Balai Kota</span></button>
+          <button class="top-nav-btn" data-tab="inventaris" id="top-btn-inventaris"><span class="tic">🎒</span><span class="tab-label">Inventaris</span></button>
         </div>
       </div>
     </div>
@@ -379,6 +397,11 @@
           <div id="inv-list"></div>
           <div class="divider"></div>
           <div class="row-between"><b id="inv-total-label">Total nilai gudang</b><b class="price-tag" id="inv-total">0 🪙</b></div>
+        </div>
+        <div class="card">
+          <h2 id="buy-produce-title">🛒 Beli Hasil Kebun</h2>
+          <p class="small muted" id="buy-produce-desc">Beli hasil kebun langsung ke gudangmu — berguna untuk membuat pakan tanpa menunggu panen. Harga beli = harga jual + harga benih (sekitar 1,5× harga jual), jadi menanam tetap lebih murah.</p>
+          <div id="buy-produce-list"></div>
         </div>
       </section>
 
@@ -483,11 +506,71 @@
         </div>
       </section>
 
+      <!-- INVENTARIS -->
+      <section class="tabpage" id="page-inventaris">
+        <div class="card">
+          <div class="row-between">
+            <h2 id="inv-page-title">🎒 Inventaris</h2>
+            <span class="pill" id="inv-page-total-pill">📦 0 item</span>
+          </div>
+          <p class="small muted" id="inv-page-desc">Semua yang kamu miliki dalam satu tempat — hasil kebun, hasil ternak, benih, pakan, dan Batu dari tambang.</p>
+          <div class="inv-summary-grid">
+            <div class="stat"><b id="inv-sum-gudang">0</b><span id="inv-sum-gudang-label">Item di gudang</span></div>
+            <div class="stat"><b id="inv-sum-nilai">0 🪙</b><span id="inv-sum-nilai-label">Nilai jual gudang</span></div>
+            <div class="stat"><b id="inv-sum-benih">0</b><span id="inv-sum-benih-label">Total benih</span></div>
+            <div class="stat"><b id="inv-sum-pakan">0</b><span id="inv-sum-pakan-label">Total pakan</span></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2 id="inv-crops-title">🌾 Hasil Kebun</h2>
+          <p class="small muted" id="inv-crops-desc">Hasil panen yang tersimpan di gudang — jual di Pasar untuk mendapatkan koin, atau pakai untuk membuat pakan.</p>
+          <div id="inv-crops-list"></div>
+          <div class="inv-cat-total"><b id="inv-crops-total-label">Total hasil kebun</b><b class="price-tag" id="inv-crops-total">0 🪙</b></div>
+          <button class="btn-green inv-go" data-inv-go="pasar" id="inv-go-pasar-1">🏪 Ke Pasar — Jual Hasil</button>
+        </div>
+
+        <div class="card">
+          <h2 id="inv-livestock-title">🐄 Hasil Ternak</h2>
+          <p class="small muted" id="inv-livestock-desc">Telur, susu, dan wol yang sudah diambil dari kandang dan tersimpan di gudang.</p>
+          <div id="inv-livestock-list"></div>
+          <div class="inv-cat-total"><b id="inv-livestock-total-label">Total hasil ternak</b><b class="price-tag" id="inv-livestock-total">0 🪙</b></div>
+          <button class="btn-green inv-go" data-inv-go="pasar" id="inv-go-pasar-2">🏪 Ke Pasar — Jual Hasil</button>
+        </div>
+
+        <div class="card">
+          <h2 id="inv-seeds-title">🌱 Benih</h2>
+          <p class="small muted" id="inv-seeds-desc">Stok benih milikmu — menanam memakai 1 benih dari stok ini. Beli tambahan di Toko Benih pada tab Kebun.</p>
+          <div id="inv-seeds-list"></div>
+          <div class="inv-cat-total"><b id="inv-seeds-total-label">Total benih</b><b id="inv-seeds-total">0</b></div>
+          <button class="btn-green inv-go" data-inv-go="kebun" id="inv-go-kebun-1">🌾 Ke Kebun — Tanam &amp; Beli Benih</button>
+        </div>
+
+        <div class="card">
+          <h2 id="inv-feed-title">🌾 Pakan</h2>
+          <p class="small muted" id="inv-feed-desc">Stok pakan untuk hewan ternakmu. Satu pakan membuat satu hewan kenyang selama 2 siklus produksi; Pakan Campuran Ayam membuat ayam kenyang 20 menit.</p>
+          <div id="inv-feed-list"></div>
+          <div class="inv-cat-total"><b id="inv-feed-total-label">Total pakan</b><b id="inv-feed-total">0</b></div>
+          <button class="btn-green inv-go" data-inv-go="ternak" id="inv-go-ternak">🐄 Ke Ternak — Beri Pakan</button>
+        </div>
+
+        <div class="card">
+          <h2 id="inv-stone-title">⛏️ Batu</h2>
+          <p class="small muted" id="inv-stone-desc">Batu hasil tambang yang sudah diambil dan tersimpan di gudang — jual di Pasar seharga 25 🪙 per Batu.</p>
+          <div id="inv-stone-list"></div>
+          <div class="inv-cat-total"><b id="inv-stone-total-label">Total Batu</b><b class="price-tag" id="inv-stone-total">0 🪙</b></div>
+          <div class="row" style="margin-top:10px">
+            <button class="btn-green grow" data-inv-go="tambang" id="inv-go-tambang">⛏️ Ke Tambang</button>
+            <button class="grow" data-inv-go="pasar" id="inv-go-pasar-3">🏪 Ke Pasar — Jual Batu</button>
+          </div>
+        </div>
+      </section>
+
       <!-- TEMAN -->
       <section class="tabpage" id="page-teman">
         <div class="card">
           <h2 id="invite-title">👥 Undang Teman</h2>
-          <p class="small" id="invite-desc">Bagikan kode undanganmu. Setiap teman yang bergabung memberimu <b>+100 🪙 +10 XP</b>.</p>
+          <p class="small" id="invite-desc">Bagikan kode undanganmu. Setiap teman yang bergabung memberimu <b>+100 🪙 +5 XP</b>.</p>
           <div style="text-align:center;margin:12px 0"><code class="code" id="my-code">FARM-??????</code></div>
           <div class="row">
             <button class="btn-green grow" id="btn-copy-code">Salin Kode</button>
@@ -511,7 +594,7 @@
 
         <div class="card">
           <h2 id="redeem-title">🎁 Punya Kode Teman?</h2>
-          <p class="small" id="redeem-desc">Masukkan kode undangan teman untuk bonus sambutan <b>+150 🪙 +25 XP</b> (sekali pakai).</p>
+          <p class="small" id="redeem-desc">Masukkan kode undangan teman untuk bonus sambutan <b>+150 🪙 +12,5 XP</b> (sekali pakai).</p>
           <div class="row">
             <input id="redeem-input" placeholder="FARM-XXXXXX" class="grow" style="text-transform:uppercase" />
             <button class="btn-green" id="btn-redeem">Tukar Kode</button>
@@ -540,16 +623,23 @@
 <script>
 "use strict";
 /* ================= DATA ================= */
+/* SEMUA pendapatan XP dikurangi SETENGAH (21 Nov 2026, atas permintaan
+   pemilik): panen per tanaman (kolom xp di CROPS), menanam / memberi
+   pakan / menjual = 0,5 XP per aksi, ambil produk ternak = 1 XP per
+   produk, hadiah XP misi harian & tonggak undangan setengahnya, teman
+   bergabung +5 XP, bonus sambutan +12,5 XP. Batas XP naik Level Petani
+   (xpForLevel) TIDAK berubah — pemain naik level 2x lebih lambat.
+   Saldo XP pemain yang sudah tersimpan tidak diubah. */
 var CROPS = [
-  {id:"wortel",   name:"Wortel", nameEn:"Carrot",   em:"🥕", seed:10, sell:18,  grow:10*60, xp:3,  thReq:1},
-  {id:"kentang",  name:"Kentang", nameEn:"Potato",  em:"🥔", seed:15, sell:28,  grow:15*60, xp:4,  thReq:1},
-  {id:"tomat",    name:"Tomat", nameEn:"Tomato",    em:"🍅", seed:20, sell:38,  grow:20*60, xp:5,  thReq:1},
-  {id:"stroberi", name:"Stroberi", nameEn:"Strawberry", em:"🍓", seed:35, sell:65,  grow:25*60, xp:8,  thReq:3},
-  {id:"jagung",   name:"Jagung", nameEn:"Corn",   em:"🌽", seed:30, sell:55,  grow:30*60, xp:7,  thReq:2},
-  {id:"labu",     name:"Labu", nameEn:"Pumpkin",     em:"🎃", seed:50, sell:95,  grow:40*60, xp:10, thReq:3},
-  {id:"apel",     name:"Apel", nameEn:"Apple",     em:"🍎", seed:60, sell:115, grow:45*60, xp:12, thReq:4},
-  {id:"semangka", name:"Semangka", nameEn:"Watermelon", em:"🍉", seed:75, sell:145, grow:50*60, xp:14, thReq:4},
-  {id:"anggur",   name:"Anggur", nameEn:"Grape",   em:"🍇", seed:90, sell:175, grow:60*60, xp:16, thReq:5}
+  {id:"wortel",   name:"Wortel", nameEn:"Carrot",   em:"🥕", seed:10, sell:18,  grow:10*60, xp:1.5,  thReq:1},
+  {id:"kentang",  name:"Kentang", nameEn:"Potato",  em:"🥔", seed:15, sell:28,  grow:15*60, xp:2,  thReq:1},
+  {id:"tomat",    name:"Tomat", nameEn:"Tomato",    em:"🍅", seed:20, sell:38,  grow:20*60, xp:2.5,  thReq:1},
+  {id:"stroberi", name:"Stroberi", nameEn:"Strawberry", em:"🍓", seed:35, sell:65,  grow:25*60, xp:4,  thReq:3},
+  {id:"jagung",   name:"Jagung", nameEn:"Corn",   em:"🌽", seed:30, sell:55,  grow:30*60, xp:3.5,  thReq:2},
+  {id:"labu",     name:"Labu", nameEn:"Pumpkin",     em:"🎃", seed:50, sell:95,  grow:40*60, xp:5, thReq:3},
+  {id:"apel",     name:"Apel", nameEn:"Apple",     em:"🍎", seed:60, sell:115, grow:45*60, xp:6, thReq:4},
+  {id:"semangka", name:"Semangka", nameEn:"Watermelon", em:"🍉", seed:75, sell:145, grow:50*60, xp:7, thReq:4},
+  {id:"anggur",   name:"Anggur", nameEn:"Grape",   em:"🍇", seed:90, sell:175, grow:60*60, xp:8, thReq:5}
 ];
 var ANIMALS = {
   ayam:  {name:"Ayam", nameEn:"Chicken",  em:"🐓", buy:120, sellBack:60,  thReq:1, cycle:5*60,  feed:15, product:"telur", pem:"🥚", pname:"Telur", pnameEn:"Egg", psell:8,  sound:"Petok petok petok!", soundEn:"Cluck cluck cluck!"},
@@ -560,7 +650,9 @@ var TH_MAXPLOTS = [3,6,9,12,15];
 var TH_UPGRADE  = [0,20000,30000,80000,100000]; /* index = level saat ini; biaya naik KE level berikutnya: Lv2=20rb, Lv3=30rb, Lv4=80rb, Lv5=100rb (Lv 4 & 5 dinaikkan 21 Nov 2026) */
 /* Syarat level petani untuk naik KE level Town Hall tsb (index = level
    tujuan, sejajar TH_UPGRADE): TH 2→Petani Lv 2, TH 3→Lv 4, TH 4→Lv 6,
-   TH 5→Lv 9. Ditampilkan sebagai info di kartu & halaman Balai Kota. */
+   TH 5→Lv 9. AKTIF & DIPERIKSA di upgradeTH(): pemain tidak bisa naik
+   Balai Kota hanya dengan koin — Level Petaninya harus mencapai syarat
+   dulu, kalau belum tombol Upgrade terkunci dan upgrade ditolak. */
 var TH_FARMER_REQ = [0,2,4,6,9];
 var FEED_STOCK_MAX = 20, FED_MAX_MS = 60*60*1000, ANIMAL_MAX = 5;
 /* Tumpukan hasil per hewan: 1 hewan menumpuk MAKSIMAL 5 hasil; begitu
@@ -732,17 +824,17 @@ function payWithTon(amountGram, onSuccess){
    Terpisah dari hadiah harian Premium Pass (1.000 koin/hari). */
 var DAILY_CLAIM_REWARDS = [100,200,300,400,500,600,1000];
 var MISSION_POOL = [
-  {key:"plant",   label:"Tanam benih", labelEn:"Plant seeds",        target:5,  rc:150, rx:10},
-  {key:"harvest", label:"Panen tanaman", labelEn:"Harvest crops",      target:5,  rc:200, rx:12},
-  {key:"sell",    label:"Jual item di pasar", labelEn:"Sell items at the market", target:10, rc:250, rx:12},
-  {key:"feed",    label:"Beri pakan hewan", labelEn:"Feed animals",   target:3,  rc:180, rx:10},
-  {key:"collect", label:"Ambil produk hewan", labelEn:"Collect animal products", target:5,  rc:220, rx:12}
+  {key:"plant",   label:"Tanam benih", labelEn:"Plant seeds",        target:5,  rc:150, rx:5},
+  {key:"harvest", label:"Panen tanaman", labelEn:"Harvest crops",      target:5,  rc:200, rx:6},
+  {key:"sell",    label:"Jual item di pasar", labelEn:"Sell items at the market", target:10, rc:250, rx:6},
+  {key:"feed",    label:"Beri pakan hewan", labelEn:"Feed animals",   target:3,  rc:180, rx:5},
+  {key:"collect", label:"Ambil produk hewan", labelEn:"Collect animal products", target:5,  rc:220, rx:6}
 ];
 var MILESTONES = [
-  {n:1,  rc:300,  rx:20, rg:0},
-  {n:3,  rc:500,  rx:30, rg:0.01},
-  {n:5,  rc:800,  rx:40, rg:0.02},
-  {n:10, rc:1500, rx:60, rg:0.05}
+  {n:1,  rc:300,  rx:10, rg:0},
+  {n:3,  rc:500,  rx:15, rg:0.01},
+  {n:5,  rc:800,  rx:20, rg:0.02},
+  {n:10, rc:1500, rx:30, rg:0.05}
 ];
 var SHOP = [
   {id:"pupuk", name:"✨ Pupuk Ajaib", nameEn:"✨ Magic Fertilizer", desc:"Semua tanaman yang sedang tumbuh langsung siap panen.", descEn:"All crops currently growing become ready to harvest instantly.", coins:300000, gram:0.15},
@@ -1111,7 +1203,7 @@ function feedAnimal(a){
   S.feedStock[a.type]--;
   a.fedUntil = t + cur + add;
   if (a.ready < STACK_MAX && !a.nextAt) { a.nextAt = t + (a.remainingMs != null ? a.remainingMs : A.cycle*1000); }
-  track("feed", 1); addXp(1);
+  track("feed", 1); addXp(0.5);
   toast(A.em + " " + aName(A) + " #" + a.num + " " + tr("diberi pakan", "fed")); haptic();
   save(); renderAll();
 }
@@ -1136,7 +1228,7 @@ function feedAllAnimals(type){
     S.feedStock[type]--;
     a.fedUntil = t + cur + add;
     if (a.ready < STACK_MAX && !a.nextAt) { a.nextAt = t + (a.remainingMs != null ? a.remainingMs : A.cycle*1000); }
-    track("feed", 1); addXp(1);
+    track("feed", 1); addXp(0.5);
     fed++;
   });
   if (fed > 0) {
@@ -1215,7 +1307,7 @@ function feedAnimalMix(a){
   S.mixFeedStock--;
   a.fedUntil = t + cur + MIX_FEED_MS;
   if (a.ready < STACK_MAX && !a.nextAt) { a.nextAt = t + (a.remainingMs != null ? a.remainingMs : A.cycle*1000); }
-  track("feed", 1); addXp(1);
+  track("feed", 1); addXp(0.5);
   toast("🥗 " + aName(A) + " #" + a.num + tr(" diberi Pakan Campuran — kenyang 20 menit", " given Mixed Feed — fed for 20 minutes")); haptic();
   save(); renderAll();
 }
@@ -1233,7 +1325,7 @@ function collectAnimal(a, silent){
   S.inv[A.product] = (S.inv[A.product]||0) + n;
   var t = nowMs();
   if (!a.nextAt && isFed(a)) a.nextAt = t + (a.remainingMs != null ? a.remainingMs : A.cycle*1000);
-  track("collect", n); addXp(2*n);
+  track("collect", n); addXp(n);
   if (!silent) { toast(A.pem + " " + n + " " + pName(A) + " " + tr("diambil", "collected")); haptic("success"); }
   return n;
 }
@@ -1473,7 +1565,8 @@ function renderTH(){
    harga + syarat upgrade, petak level ini & berikutnya, yang terbuka di
    tiap level, dan status Tarik Gram. Ini satu-satunya tempat info
    Town Hall tampil; tombol Upgradenya memakai fungsi upgradeTH(). */
-var bkListTh = 0; /* daftar per level hanya digambar ulang bila TH berubah */
+var bkListTh = 0; /* daftar per level digambar ulang bila TH / Level Petani berubah */
+var bkListFarmer = 0;
 function renderBalaiKota(){
   if (!$("bk-level")) return;
   $("bk-level").textContent = S.th;
@@ -1487,17 +1580,22 @@ function renderBalaiKota(){
     up2.disabled = true; up2.textContent = tr("Balai Kota Level Maksimal (5)", "Town Hall at Max Level (5)");
   } else {
     var target = S.th + 1, req = TH_FARMER_REQ[S.th], mine = playerLevel();
+    var farmerOk = mine >= req;
     info.textContent = tr("Upgrade ke Level ", "Upgrade to Level ") + target + ": " + fmt(TH_UPGRADE[S.th]) + " 🪙 · " +
-      tr("Syarat level petani: Lv ", "Farmer level required: Lv ") + req + " · " +
-      tr("Level kamu: Lv ", "Your level: Lv ") + mine + (mine >= req ? " ✓" : "");
-    up2.disabled = false; up2.textContent = tr("Upgrade ke Lv ", "Upgrade to Lv ") + target + " · " + fmt(TH_UPGRADE[S.th]) + " 🪙";
+      tr("Syarat Level Petani: Lv ", "Farmer Level required: Lv ") + req + " · " +
+      tr("Level kamu: Lv ", "Your level: Lv ") + mine + (farmerOk ? " ✓" : tr(" 🔒 — naikkan Level Petani dulu untuk bisa upgrade", " 🔒 — raise your Farmer Level first to upgrade"));
+    if (farmerOk) {
+      up2.disabled = false; up2.textContent = tr("Upgrade ke Lv ", "Upgrade to Lv ") + target + " · " + fmt(TH_UPGRADE[S.th]) + " 🪙";
+    } else {
+      up2.disabled = true; up2.textContent = tr("🔒 Butuh Level Petani Lv ", "🔒 Requires Farmer Lv ") + req;
+    }
   }
   var ok = S.th >= 4;
   $("bk-gram-status").textContent = ok ? tr("Terbuka ✓ (min. tarik 0,5 Gram)", "Unlocked ✓ (min. withdrawal 0.5 Gram)") : tr("Terkunci — butuh Balai Kota Lv 4", "Locked — requires Town Hall Lv 4");
   $("bk-gram-detail").textContent = tr("Saldo Gram kamu: 💎 ", "Your Gram balance: 💎 ") + fmtGram(S.gram) + " · " +
     tr("Minimal tarik 0,5 Gram", "Minimum withdrawal 0.5 Gram") + (ok ? "" : tr(" · Terbuka di Balai Kota Lv 4", " · Unlocks at Town Hall Lv 4"));
-  if (bkListTh !== S.th) {
-    bkListTh = S.th;
+  if (bkListTh !== S.th || bkListFarmer !== playerLevel()) {
+    bkListTh = S.th; bkListFarmer = playerLevel();
     var html = "";
     for (var L = 1; L <= 5; L++) {
       var crops = CROPS.filter(function(c){ return (c.thReq || 1) === L; });
@@ -1506,9 +1604,13 @@ function renderBalaiKota(){
       var priceLine = L === 1
         ? '<p class="small">💰 ' + tr("Harga: ", "Price: ") + "<b>" + tr("Level awal — gratis", "Starting level — free") + "</b></p>"
         : '<p class="small">💰 ' + tr("Harga upgrade: ", "Upgrade price: ") + '<b class="price-tag">' + fmt(TH_UPGRADE[L-1]) + " 🪙</b></p>";
+      var farmerLine = L === 1
+        ? '<p class="small">👨‍🌾 ' + tr("Syarat Level Petani: ", "Farmer Level required: ") + "<b>" + tr("Level awal — tanpa syarat", "Starting level — no requirement") + "</b></p>"
+        : '<p class="small">👨‍🌾 ' + tr("Syarat Level Petani: ", "Farmer Level required: ") + "<b>Lv " + TH_FARMER_REQ[L-1] + "</b>" + (L > S.th ? (playerLevel() >= TH_FARMER_REQ[L-1] ? " ✓" : " 🔒") : (L <= S.th ? " ✓" : "")) + "</p>";
       html += '<div class="bk-row' + (L === S.th ? " cur" : (L > S.th ? " locked" : "")) + '">' +
         "<b>🏛️ " + tr("Level ", "Level ") + L + "</b>" + badge +
         priceLine +
+        farmerLine +
         '<p class="small">🌱 ' + tr("Petak maks: ", "Max plots: ") + "<b>" + TH_MAXPLOTS[L-1] + "</b></p>" +
         '<p class="small">🌾 ' + tr("Tanaman: ", "Crops: ") + (crops.length ? crops.map(function(c){ return c.em + " " + cName(c); }).join(", ") : "—") + "</p>" +
         '<p class="small">🐾 ' + tr("Hewan: ", "Animals: ") + (animals.length ? animals.map(function(k){ return ANIMALS[k].em + " " + aName(ANIMALS[k]); }).join(", ") : "—") + "</p>" +
@@ -1664,7 +1766,7 @@ function plotTap(i){
        Premium diterapkan dinamis lewat effReadyAt(). */
     S.plots[i] = { crop: c.id, plantedAt: t, readyAt: t + c.grow*1000 };
     S.seedStock[c.id] = seedStockOf(c.id) - 1; /* menanam memakai 1 benih dari stok pemain */
-    track("plant", 1); addXp(1);
+    track("plant", 1); addXp(0.5);
     toast(c.em + " " + cName(c) + " " + tr("ditanam", "planted")); haptic();
   } else if (t >= effReadyAt(p)) {
     var c2 = cropById(p.crop);
@@ -1865,9 +1967,145 @@ function sellItem(id, n){
   var info = itemInfo(id);
   var gain = info.sell * n;
   S.inv[id] -= n; addCoins(gain);
-  track("sell", n); addXp(n);
+  track("sell", n); addXp(n/2);
   toast("🏪 " + info.name + " ×" + n + tr(" terjual", " sold") + " · +" + fmt(gain) + " 🪙"); haptic("success");
   save(); renderAll();
+}
+/* Beli Hasil Kebun di Pasar (21 Nov 2026, atas permintaan pemilik):
+   pemain bisa membeli hasil kebun langsung ke gudang (S.inv) — berguna
+   untuk membuat pakan tanpa menunggu panen. Harga beli = harga jual +
+   harga benih (≈1,5× harga jual): selalu lebih mahal dari harga jual,
+   jadi beli lalu jual lagi pasti rugi (tidak ada celah untung), dan
+   menanam sendiri (cukup harga benih) tetap jauh lebih murah. Hasil
+   yang dibeli TIDAK dihitung sebagai penjualan misi. */
+function produceBuyPrice(c){ return c.sell + c.seed; }
+function renderBuyProduce(){
+  var el = $("buy-produce-list"); if (!el) return;
+  var html = "";
+  CROPS.forEach(function(c){
+    var locked = S.th < (c.thReq || 1);
+    if (locked) {
+      html += '<div class="shop-row locked"><span class="em">🔒</span><div class="grow"><b>' + cName(c) + '</b>' +
+        '<span class="small muted">' + tr("Terbuka di Balai Kota Lv ", "Unlocks at Town Hall Lv ") + c.thReq + '</span></div></div>';
+      return;
+    }
+    var price = produceBuyPrice(c), own = S.inv[c.id] || 0;
+    html += '<div class="shop-row"><span class="em">' + c.em + '</span><div class="grow"><b>' + cName(c) + '</b>' +
+      '<span class="small muted">' + tr("Beli ", "Buy ") + price + ' 🪙 · ' + tr("Jual ", "Sell ") + c.sell + ' 🪙 · 📦 ' + tr("Di gudang: ", "In storage: ") + '<b>' + own + '</b></span></div>' +
+      '<div class="shop-btns">' +
+      '<button class="btn-green btn-small" data-prodbuy="1" data-id="' + c.id + '">' + tr("Beli 1", "Buy 1") + '</button>' +
+      '<button class="btn-green btn-small" data-prodbuy="5" data-id="' + c.id + '">' + tr("Beli 5", "Buy 5") + '</button>' +
+      '</div></div>';
+  });
+  el.innerHTML = html;
+  el.querySelectorAll("button[data-prodbuy]").forEach(function(b){
+    b.onclick = function(){ buyProduce(b.dataset.id, parseInt(b.dataset.prodbuy, 10) || 1); };
+  });
+}
+function buyProduce(id, qty){
+  var c = cropById(id); if (!c) return;
+  if (S.th < (c.thReq || 1)) { toast(tr("🔒 " + cName(c) + " terkunci — terbuka di Balai Kota Lv " + c.thReq, "🔒 " + cName(c) + " is locked — unlocks at Town Hall Lv " + c.thReq)); haptic("error"); return; }
+  if (!spendCoins(produceBuyPrice(c) * qty)) { renderStatus(); return; }
+  S.inv[id] = (S.inv[id] || 0) + qty;
+  toast(tr("🛒 Beli ", "🛒 Bought ") + qty + " " + cName(c) + tr(" · di gudang: ", " · in storage: ") + S.inv[id]);
+  haptic(); save(); renderAll();
+}
+
+/* ================= RENDER: INVENTARIS =================
+   Halaman 🎒 Inventaris (dari tombol atas, sejajar Premium & Balai
+   Kota): SEMUA milik pemain dalam satu tempat, diperbarui tiap
+   renderAll() dari data simpan yang sama — tidak ada data baru:
+   - Hasil Kebun & Hasil Ternak & Batu: dari gudang S.inv (tanaman,
+     telur/susu/wol, dan "bijih" = Batu), lengkap dengan harga jual
+     per item dan total nilai jualnya (harga yang sama seperti Pasar).
+   - Benih: dari stok benih S.seedStock (yang dipakai saat menanam).
+   - Pakan: dari S.feedStock per jenis hewan + S.mixFeedStock
+     (Pakan Campuran Ayam), dengan batas stok FEED_STOCK_MAX.
+   Semua jenis tetap ditampilkan walau jumlahnya 0 (barisnya redup)
+   supaya pemain tahu apa saja yang bisa dimiliki; tombol di bawah
+   tiap kartu hanya berpindah tab (Pasar / Kebun / Ternak / Tambang)
+   dan tidak mengubah data apa pun. */
+function invRowHtml(em, name, sub, n, unit){
+  return '<div class="inv-row' + (n > 0 ? "" : " zero") + '"><span class="em">' + em + '</span>' +
+    '<div class="grow"><b>' + name + '</b><div class="small muted">' + sub + '</div></div>' +
+    '<span class="inv-count' + (n > 0 ? " has" : "") + '">× ' + fmt(n) + (unit ? " " + unit : "") + '</span></div>';
+}
+function renderInventory(){
+  var cropsEl = $("inv-crops-list"); if (!cropsEl) return;
+  if (!S.inv) S.inv = {};
+  var gudangCount = 0, gudangValue = 0;
+
+  /* Hasil Kebun — semua tanaman, dari gudang */
+  var cropsHtml = "", cropsCount = 0, cropsValue = 0;
+  CROPS.forEach(function(c){
+    var n = S.inv[c.id] || 0;
+    cropsCount += n; cropsValue += n * c.sell;
+    cropsHtml += invRowHtml(c.em, cName(c),
+      tr("Harga jual ", "Sell price ") + fmt(c.sell) + " 🪙" + (n > 0 ? " · " + tr("Senilai ", "Worth ") + fmt(n * c.sell) + " 🪙" : ""), n, "");
+  });
+  cropsEl.innerHTML = cropsHtml;
+  $("inv-crops-total").textContent = fmt(cropsCount) + tr(" item · ", " items · ") + fmt(cropsValue) + " 🪙";
+  gudangCount += cropsCount; gudangValue += cropsValue;
+
+  /* Hasil Ternak — telur, susu, wol, dari gudang */
+  var liveHtml = "", liveCount = 0, liveValue = 0;
+  Object.keys(ANIMALS).forEach(function(type){
+    var A = ANIMALS[type], n = S.inv[A.product] || 0;
+    liveCount += n; liveValue += n * A.psell;
+    liveHtml += invRowHtml(A.pem, pName(A),
+      A.em + " " + aName(A) + " · " + tr("Harga jual ", "Sell price ") + fmt(A.psell) + " 🪙" + (n > 0 ? " · " + tr("Senilai ", "Worth ") + fmt(n * A.psell) + " 🪙" : ""), n, "");
+  });
+  $("inv-livestock-list").innerHTML = liveHtml;
+  $("inv-livestock-total").textContent = fmt(liveCount) + tr(" item · ", " items · ") + fmt(liveValue) + " 🪙";
+  gudangCount += liveCount; gudangValue += liveValue;
+
+  /* Benih — stok benih milik pemain */
+  var seedsHtml = "", seedsCount = 0;
+  CROPS.forEach(function(c){
+    var n = seedStockOf(c.id);
+    seedsCount += n;
+    var locked = S.th < (c.thReq || 1);
+    seedsHtml += invRowHtml(c.em, tr("Benih ", "Seed ") + cName(c),
+      tr("Harga benih ", "Seed price ") + fmt(c.seed) + " 🪙" + (locked ? " · 🔒 " + tr("Terbuka di Balai Kota Lv ", "Unlocks at Town Hall Lv ") + c.thReq : ""), n, "");
+  });
+  $("inv-seeds-list").innerHTML = seedsHtml;
+  $("inv-seeds-total").textContent = fmt(seedsCount) + tr(" benih", " seeds");
+
+  /* Pakan — stok per jenis hewan + Pakan Campuran Ayam */
+  var feedHtml = "", feedCount = 0;
+  Object.keys(ANIMALS).forEach(function(type){
+    var A = ANIMALS[type], n = (S.feedStock && S.feedStock[type]) || 0;
+    feedCount += n;
+    var feedName = LANG === "en" ? (aName(A) + " Feed") : ("Pakan " + aName(A));
+    feedHtml += invRowHtml("🌾", feedName,
+      A.em + " " + aName(A) + " · " + tr("Stok ", "Stock ") + n + " / " + FEED_STOCK_MAX + " · " + tr("Beli ", "Buy ") + fmt(A.feed) + " 🪙", n, "");
+  });
+  var mixN = S.mixFeedStock || 0;
+  feedCount += mixN;
+  feedHtml += invRowHtml("🥗", tr("Pakan Campuran Ayam", "Chicken Mixed Feed"),
+    "🐓 " + aName(ANIMALS.ayam) + " · " + tr("Stok ", "Stock ") + mixN + " / " + FEED_STOCK_MAX + " · " + tr("1 pakan = kenyang 20 menit", "1 feed = 20 min fed"), mixN, "");
+  $("inv-feed-list").innerHTML = feedHtml;
+  $("inv-feed-total").textContent = fmt(feedCount) + tr(" pakan", " feed");
+
+  /* Batu — dari gudang (kunci simpan "bijih") */
+  var batuN = S.inv["bijih"] || 0;
+  $("inv-stone-list").innerHTML = invRowHtml("⛏️", "Batu",
+    tr("Harga jual ", "Sell price ") + fmt(ORE_SELL) + " 🪙" + (batuN > 0 ? " · " + tr("Senilai ", "Worth ") + fmt(batuN * ORE_SELL) + " 🪙" : ""), batuN, "");
+  $("inv-stone-total").textContent = fmt(batuN) + " Batu · " + fmt(batuN * ORE_SELL) + " 🪙";
+  gudangCount += batuN; gudangValue += batuN * ORE_SELL;
+
+  /* Ringkasan di kartu atas */
+  var totalAll = gudangCount + seedsCount + feedCount;
+  $("inv-page-total-pill").textContent = "📦 " + fmt(totalAll) + " item";
+  $("inv-sum-gudang").textContent = fmt(gudangCount);
+  $("inv-sum-nilai").textContent = fmt(gudangValue) + " 🪙";
+  $("inv-sum-benih").textContent = fmt(seedsCount);
+  $("inv-sum-pakan").textContent = fmt(feedCount);
+
+  /* Tombol pintas di bawah tiap kartu: hanya berpindah tab */
+  document.querySelectorAll("#page-inventaris button[data-inv-go]").forEach(function(b){
+    b.onclick = function(){ haptic(); switchTab(b.dataset.invGo); };
+  });
 }
 
 /* ================= KLAIM HARIAN (STREAK) ================= */
@@ -2199,13 +2437,13 @@ function renderExPreview(){
 
 /* ================= RENDER: TEMAN ================= */
 function inviteMessage(){
-  return tr("🌾 Ayo main Farm Simulator bareng aku! Tanam, panen, pelihara ternak, dan kumpulkan koin. Pakai kode undanganku ", "🌾 Come play Farm Simulator with me! Plant, harvest, raise livestock, and collect coins. Use my invite code ") + S.inviteCode + tr(" saat mulai supaya dapat bonus sambutan +150 🪙 +25 XP. Selamat bertani!", " when you start to get a welcome bonus of +150 🪙 +25 XP. Happy farming!");
+  return tr("🌾 Ayo main Farm Simulator bareng aku! Tanam, panen, pelihara ternak, dan kumpulkan koin. Pakai kode undanganku ", "🌾 Come play Farm Simulator with me! Plant, harvest, raise livestock, and collect coins. Use my invite code ") + S.inviteCode + tr(" saat mulai supaya dapat bonus sambutan +150 🪙 +12,5 XP. Selamat bertani!", " when you start to get a welcome bonus of +150 🪙 +12.5 XP. Happy farming!");
 }
 function renderFriends(){
   $("my-code").textContent = S.inviteCode;
   $("friend-count").textContent = S.friends.length;
   var fl = $("friend-list");
-  fl.innerHTML = S.friends.length ? S.friends.map(function(f){ return '<div class="hist-row"><span>👤 ' + esc(f.name) + '</span><span class="muted">' + f.date + '</span><span>+100 🪙 +10 XP</span></div>'; }).join("") : "";
+  fl.innerHTML = S.friends.length ? S.friends.map(function(f){ return '<div class="hist-row"><span>👤 ' + esc(f.name) + '</span><span class="muted">' + f.date + '</span><span>+100 🪙 +5 XP</span></div>'; }).join("") : "";
   var ml = $("mile-list"); ml.innerHTML = "";
   var claimable = 0;
   MILESTONES.forEach(function(m, i){
@@ -2242,7 +2480,7 @@ function renderAll(){
   S.animals.forEach(settleAnimal);
   if (Array.isArray(S.miners)) S.miners.forEach(settleMiner);
   renderStatus(); renderTH(); renderBalaiKota(); renderSeeds(); renderSeedShop(); renderPlots(); renderPens(); renderTambang();
-  renderMarket(); renderDailyClaim(); renderMissions(); renderGram(); renderFriends();
+  renderMarket(); renderBuyProduce(); renderInventory(); renderDailyClaim(); renderMissions(); renderGram(); renderFriends();
 }
 /* render ringan tiap detik: hanya hitung mundur & status */
 var lastGrowFactor = null;
@@ -2251,6 +2489,11 @@ function tickRender(){
   S.animals.forEach(settleAnimal);
   if (Array.isArray(S.miners)) S.miners.forEach(settleMiner);
   renderStatus(); renderTH(); renderBalaiKota(); renderPlots(); renderPens(); renderTambang(); renderDailyClaim(); renderMissions(); renderFriends(); renderPremium();
+  /* Halaman Inventaris yang sedang terbuka ikut diperbarui tiap detik
+     (mis. Batu / hasil yang baru diambil dari tab lain tidak terjadi
+     di sini, tetapi angka ringkasan tetap segar tanpa render penuh). */
+  var invPg = $("page-inventaris");
+  if (invPg && invPg.classList.contains("active")) renderInventory();
   /* Batas waktu batal penarikan: bila ada permintaan "menunggu" yang baru
      saja melewati 10 menit, render ulang tab Gram agar tombol Batalkan
      langsung nonaktif tanpa pemain harus berpindah tab dulu. */
@@ -2349,10 +2592,20 @@ $("btn-buy-plot").addEventListener("click", function(){
   toast(tr("🌱 Petak baru dibeli · total " + S.plotsOwned + " petak", "🌱 New plot bought · " + S.plotsOwned + " plots total")); haptic("success");
   save(); renderAll();
 });
-/* Upgrade Town Hall — dipakai tombol di halaman Balai Kota;
-   perilaku & harga sama persis seperti sebelumnya. */
+/* Upgrade Town Hall — dipakai tombol di halaman Balai Kota.
+   Syarat Level Petani AKTIF: selain koin, Level Petani pemain harus
+   mencapai TH_FARMER_REQ untuk level tujuan (TH 2→Lv 2, TH 3→Lv 4,
+   TH 4→Lv 6, TH 5→Lv 9). Bila belum tercapai, upgrade DITOLAK tanpa
+   memotong koin apa pun dan pemain diberi tahu syaratnya. */
 function upgradeTH(){
   if (S.th >= 5) return;
+  var req = TH_FARMER_REQ[S.th], mine = playerLevel(), target = S.th + 1;
+  if (mine < req) {
+    toast(tr("🔒 Butuh Level Petani Lv " + req + " untuk naik ke Balai Kota Lv " + target + " — level kamu baru Lv " + mine, "🔒 Requires Farmer Lv " + req + " to upgrade to Town Hall Lv " + target + " — you are only Lv " + mine));
+    haptic("error");
+    renderAll();
+    return;
+  }
   var cost = TH_UPGRADE[S.th];
   if (!spendCoins(cost)) { renderStatus(); return; }
   S.th++;
@@ -2366,7 +2619,7 @@ $("btn-sell-all").addEventListener("click", function(){
     var n = S.inv[id] || 0; if (n > 0) { total += itemInfo(id).sell * n; count += n; S.inv[id] = 0; }
   });
   if (!count) { toast(tr("Gudang kosong", "Storage is empty")); haptic("error"); return; }
-  addCoins(total); track("sell", count); addXp(count);
+  addCoins(total); track("sell", count); addXp(count/2);
   toast(tr("🏪 Semua terjual · +", "🏪 Everything sold · +") + fmt(total) + " 🪙"); haptic("success");
   save(); renderAll();
 });
@@ -2429,9 +2682,9 @@ $("btn-add-friend").addEventListener("click", function(){
   var name = $("friend-name").value.trim();
   if (!name) { toast(tr("Isi nama teman dulu", "Enter your friend's name first")); haptic("error"); return; }
   S.friends.push({ name: name, date: todayStr() });
-  addCoins(100); addXp(10);
+  addCoins(100); addXp(5);
   $("friend-name").value = "";
-  toast("👥 " + name + tr(" bergabung", " joined") + " · +100 🪙 +10 XP"); haptic("success");
+  toast("👥 " + name + tr(" bergabung", " joined") + " · +100 🪙 +5 XP"); haptic("success");
   save(); renderAll();
 });
 $("btn-redeem").addEventListener("click", function(){
@@ -2439,8 +2692,8 @@ $("btn-redeem").addEventListener("click", function(){
   if (S.redeemed) { toast(tr("Bonus sambutan sudah pernah ditukar", "The welcome bonus has already been redeemed")); haptic("error"); return; }
   if (!/^FARM-[A-Z0-9]{6}$/.test(code)) { toast(tr("Format kode: FARM-XXXXXX", "Code format: FARM-XXXXXX")); haptic("error"); return; }
   if (code === S.inviteCode) { toast(tr("Tidak bisa memakai kode sendiri", "You can't use your own code")); haptic("error"); return; }
-  S.redeemed = true; addCoins(150); addXp(25);
-  toast(tr("🎁 Bonus sambutan · +150 🪙 +25 XP", "🎁 Welcome bonus · +150 🪙 +25 XP")); haptic("success");
+  S.redeemed = true; addCoins(150); addXp(12.5);
+  toast(tr("🎁 Bonus sambutan · +150 🪙 +12,5 XP", "🎁 Welcome bonus · +150 🪙 +12.5 XP")); haptic("success");
   $("redeem-input").value = "";
   save(); renderAll();
 });
@@ -2477,6 +2730,8 @@ function applyStaticTexts(){
   set("btn-sell-all", tr("Jual Semua", "Sell All"));
   set("market-desc", tr("Jual hasil panen, produk ternak, dan Batu dari tambang dari gudang untuk mendapatkan koin.", "Sell harvested crops, animal products, and Batu from the mine from storage to earn coins."));
   set("inv-total-label", tr("Total nilai gudang", "Total storage value"));
+  set("buy-produce-title", tr("🛒 Beli Hasil Kebun", "🛒 Buy Garden Produce"));
+  set("buy-produce-desc", tr("Beli hasil kebun langsung ke gudangmu — berguna untuk membuat pakan tanpa menunggu panen. Harga beli = harga jual + harga benih (sekitar 1,5× harga jual), jadi menanam tetap lebih murah.", "Buy garden produce straight into your storage — handy for crafting feed without waiting for a harvest. Buy price = sell price + seed price (about 1.5× the sell price), so growing your own stays cheaper."));
   set("mission-title", tr("📋 Misi Harian", "📋 Daily Missions"));
   set("mission-desc", tr("Misi diperbarui setiap hari. Selesaikan dan klaim hadiahnya.", "Missions refresh every day. Complete them and claim the rewards."));
   set("wallet-title", tr("👛 Dompet Gram", "👛 Gram Wallet"));
@@ -2504,7 +2759,7 @@ function applyStaticTexts(){
   set("wd-cancel-note", tr("Penarikan tidak bisa dibatalkan setelah 10 menit.", "Withdrawals cannot be cancelled after 10 minutes."));
   set("shop-title", tr("💎 Toko Premium", "💎 Premium Shop"));
   set("invite-title", tr("👥 Undang Teman", "👥 Invite Friends"));
-  setH("invite-desc", tr("Bagikan kode undanganmu. Setiap teman yang bergabung memberimu <b>+100 🪙 +10 XP</b>.", "Share your invite code. Every friend who joins gives you <b>+100 🪙 +10 XP</b>."));
+  setH("invite-desc", tr("Bagikan kode undanganmu. Setiap teman yang bergabung memberimu <b>+100 🪙 +5 XP</b>.", "Share your invite code. Every friend who joins gives you <b>+100 🪙 +5 XP</b>."));
   set("btn-copy-code", tr("Salin Kode", "Copy Code"));
   set("btn-copy-msg", tr("Salin Pesan Undangan", "Copy Invite Message"));
   set("friend-heading", tr("Teman yang bergabung pakai kodemu", "Friends who joined with your code"));
@@ -2515,10 +2770,37 @@ function applyStaticTexts(){
   set("mile-title", tr("🏆 Tonggak Undangan", "🏆 Invite Milestones"));
   setH("mile-desc", tr("Total hadiah Gram dari semua tonggak maksimal <b>0,08 Gram</b>.", "The total Gram reward from all milestones is at most <b>0.08 Gram</b>."));
   set("redeem-title", tr("🎁 Punya Kode Teman?", "🎁 Have a Friend's Code?"));
-  setH("redeem-desc", tr("Masukkan kode undangan teman untuk bonus sambutan <b>+150 🪙 +25 XP</b> (sekali pakai).", "Enter a friend's invite code for a welcome bonus of <b>+150 🪙 +25 XP</b> (one-time)."));
+  setH("redeem-desc", tr("Masukkan kode undangan teman untuk bonus sambutan <b>+150 🪙 +12,5 XP</b> (sekali pakai).", "Enter a friend's invite code for a welcome bonus of <b>+150 🪙 +12.5 XP</b> (one-time)."));
   set("btn-redeem", tr("Tukar Kode", "Redeem Code"));
   set("footer-note", tr("Progres tersimpan otomatis di perangkat ini.", "Progress is saved automatically on this device."));
-  var tabNames = { kebun: tr("Kebun", "Garden"), ternak: tr("Ternak", "Livestock"), tambang: tr("Tambang", "Mine"), pasar: tr("Pasar", "Market"), misi: tr("Misi", "Missions"), gram: tr("Dompet", "Wallet"), premium: "Premium", balaikota: tr("Balai Kota", "Town Hall"), teman: tr("Teman", "Friends") };
+  set("inv-page-title", tr("🎒 Inventaris", "🎒 Inventory"));
+  set("inv-page-desc", tr("Semua yang kamu miliki dalam satu tempat — hasil kebun, hasil ternak, benih, pakan, dan Batu dari tambang.", "Everything you own in one place — garden produce, animal products, seeds, feed, and Batu from the mine."));
+  set("inv-sum-gudang-label", tr("Item di gudang", "Items in storage"));
+  set("inv-sum-nilai-label", tr("Nilai jual gudang", "Storage sell value"));
+  set("inv-sum-benih-label", tr("Total benih", "Total seeds"));
+  set("inv-sum-pakan-label", tr("Total pakan", "Total feed"));
+  set("inv-crops-title", tr("🌾 Hasil Kebun", "🌾 Garden Produce"));
+  set("inv-crops-desc", tr("Hasil panen yang tersimpan di gudang — jual di Pasar untuk mendapatkan koin, atau pakai untuk membuat pakan.", "Harvested produce stored in your storage — sell it at the Market for coins, or use it to craft feed."));
+  set("inv-crops-total-label", tr("Total hasil kebun", "Total garden produce"));
+  set("inv-go-pasar-1", tr("🏪 Ke Pasar — Jual Hasil", "🏪 To the Market — Sell Produce"));
+  set("inv-livestock-title", tr("🐄 Hasil Ternak", "🐄 Animal Products"));
+  set("inv-livestock-desc", tr("Telur, susu, dan wol yang sudah diambil dari kandang dan tersimpan di gudang.", "Eggs, milk, and wool already collected from the pens and stored in your storage."));
+  set("inv-livestock-total-label", tr("Total hasil ternak", "Total animal products"));
+  set("inv-go-pasar-2", tr("🏪 Ke Pasar — Jual Hasil", "🏪 To the Market — Sell Produce"));
+  set("inv-seeds-title", tr("🌱 Benih", "🌱 Seeds"));
+  set("inv-seeds-desc", tr("Stok benih milikmu — menanam memakai 1 benih dari stok ini. Beli tambahan di Toko Benih pada tab Kebun.", "Your seed stock — planting uses 1 seed from this stock. Buy more at the Seed Shop in the Garden tab."));
+  set("inv-seeds-total-label", tr("Total benih", "Total seeds"));
+  set("inv-go-kebun-1", tr("🌾 Ke Kebun — Tanam & Beli Benih", "🌾 To the Garden — Plant & Buy Seeds"));
+  set("inv-feed-title", tr("🌾 Pakan", "🌾 Feed"));
+  set("inv-feed-desc", tr("Stok pakan untuk hewan ternakmu. Satu pakan membuat satu hewan kenyang selama 2 siklus produksi; Pakan Campuran Ayam membuat ayam kenyang 20 menit.", "Feed stock for your animals. One feed keeps one animal fed for 2 production cycles; Chicken Mixed Feed keeps a chicken fed for 20 minutes."));
+  set("inv-feed-total-label", tr("Total pakan", "Total feed"));
+  set("inv-go-ternak", tr("🐄 Ke Ternak — Beri Pakan", "🐄 To Livestock — Feed Animals"));
+  set("inv-stone-title", tr("⛏️ Batu", "⛏️ Batu"));
+  set("inv-stone-desc", tr("Batu hasil tambang yang sudah diambil dan tersimpan di gudang — jual di Pasar seharga 25 🪙 per Batu.", "Batu from the mine already collected into your storage — sell it at the Market for 25 🪙 per Batu."));
+  set("inv-stone-total-label", tr("Total Batu", "Total Batu"));
+  set("inv-go-tambang", tr("⛏️ Ke Tambang", "⛏️ To the Mine"));
+  set("inv-go-pasar-3", tr("🏪 Ke Pasar — Jual Batu", "🏪 To the Market — Sell Batu"));
+  var tabNames = { kebun: tr("Kebun", "Garden"), ternak: tr("Ternak", "Livestock"), tambang: tr("Tambang", "Mine"), pasar: tr("Pasar", "Market"), misi: tr("Misi", "Missions"), gram: tr("Dompet", "Wallet"), premium: "Premium", balaikota: tr("Balai Kota", "Town Hall"), inventaris: tr("Inventaris", "Inventory"), teman: tr("Teman", "Friends") };
   document.querySelectorAll("button[data-tab]").forEach(function(b){
     var s = b.querySelector(".tab-label"); if (s && tabNames[b.dataset.tab]) s.textContent = tabNames[b.dataset.tab];
   });
