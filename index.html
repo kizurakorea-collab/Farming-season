@@ -81,6 +81,17 @@
       .sb-title{font-weight:800;font-size:16px;margin-right:auto}
       .pill{display:inline-flex;align-items:center;gap:5px;background:var(--card);
         border:1px solid var(--line);border-radius:999px;padding:5px 11px;font-weight:700;font-size:13.5px}
+      /* Saldo koin di bar atas sebagai tombol: tampilan sama persis
+         seperti pill biasa, hanya bisa ditekan menuju pembelian koin.
+         JANGAN pakai font:inherit di sini — shorthand itu menimpa
+         font-size .pill (13,5px) menjadi ukuran body (15px), membuat
+         pill koin lebih besar dari pill Gram sampai tombol musik
+         terdorong ke baris kedua dan bar atas bertambah tinggi. */
+      button.pill{line-height:1.2;min-height:0;-webkit-tap-highlight-color:transparent}
+      button.pill.pill-coins{cursor:pointer}
+      button.pill.pill-coins:active{transform:scale(.96)}
+      /* Sorotan sesaat pada paket koin setelah dibuka dari bar atas */
+      .shop-item.flash{outline:3px solid var(--amber);outline-offset:1px}
       .pill.gram{color:#7a4fd0;border-color:#cdbcf2;background:#f3edff}
       @media (prefers-color-scheme: dark){.pill.gram{color:#c9aef7;background:#33284d;border-color:#574a7d}}
       .xpbar{height:8px;background:var(--card2);border:1px solid var(--line);border-radius:99px;overflow:hidden;margin-top:8px}
@@ -180,6 +191,18 @@
       .pbar{width:88%;height:7px;background:rgba(0,0,0,.15);border-radius:99px;overflow:hidden}
       .pbar>i{display:block;height:100%;background:var(--green)}
       .plot.ready .pbar>i{background:var(--green-d)}
+      /* lencana "Siap Panen" di petak yang siap — sama seperti lencana siap pada hewan ternak */
+      .plot.ready{padding-top:24px}
+      .plot .rdy-badge{position:absolute;top:5px;left:50%;transform:translateX(-50%);
+        background:var(--green);color:#fff;font-size:10px;font-weight:800;letter-spacing:.2px;
+        border-radius:99px;padding:2px 6px;white-space:nowrap;box-shadow:0 2px 5px rgba(0,0,0,.25);z-index:2}
+      .plot.flash{outline:3px solid var(--amber);outline-offset:1px}
+      /* pemberitahuan ringkas di atas kartu Kebun Saya — hanya muncul bila ada tanaman siap panen */
+      .harvest-alert{display:none;width:100%;margin-bottom:12px;padding:11px 14px;border-radius:14px;
+        background:var(--green-soft);border:2px solid var(--green);color:var(--green-d);
+        font:inherit;font-weight:800;font-size:14.5px;text-align:center;cursor:pointer;
+        box-shadow:0 3px 8px rgba(46,125,50,.18)}
+      .harvest-alert.show{display:block}
 
       /* pens */
       .pen{border-radius:14px;overflow:hidden;border:3px solid var(--wood-d);margin-bottom:10px}
@@ -195,6 +218,7 @@
       .animal{position:absolute;width:64px;margin-left:-32px;margin-top:-46px;text-align:center;
         cursor:pointer;user-select:none;-webkit-user-select:none;z-index:2}
       .animal .nm{display:inline-block;background:var(--chip);color:#5a4326;border:1px solid var(--wood);
+        font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
         font-size:10.5px;font-weight:700;border-radius:99px;padding:1px 7px;white-space:nowrap;
         box-shadow:0 1px 3px rgba(0,0,0,.25)}
       .animal .em{font-size:34px;line-height:1.15;display:block;filter:drop-shadow(0 2px 2px rgba(0,0,0,.25))}
@@ -261,7 +285,7 @@
       <div class="statusbar-in">
         <div class="sb-row">
           <span class="sb-title">🌾 Farming Season</span>
-          <span class="pill">🪙 <span id="sb-coins">0</span></span>
+          <button type="button" class="pill pill-coins" id="sb-coins-btn" title="Beli koin" aria-label="Beli koin">🪙 <span id="sb-coins">0</span></button>
           <span class="pill gram">💎 <span id="sb-gram">0</span></span>
           <button class="icon-btn" id="btn-music" title="Musik latar">🔇</button>
         </div>
@@ -282,6 +306,7 @@
     <div class="wrap">
       <!-- KEBUN -->
       <section class="tabpage active" id="page-kebun">
+        <button class="harvest-alert" id="harvest-alert" type="button"></button>
         <div class="card">
           <div class="row-between">
             <h2 id="garden-title">🌾 Kebun Saya</h2>
@@ -338,7 +363,7 @@
           </div>
           <p class="tiny muted" style="margin-top:6px" id="gram-bal-note">Saldo ini berasal dari tukar koin &amp; hadiah di dalam game.</p>
           <div class="divider"></div>
-          <h3 id="ton-title">💎 Dompet TON Asli — TON Connect</h3>
+          <h3 id="ton-title">💎 Dompet TON</h3>
           <div class="row-between" style="margin-top:6px">
             <div><div class="small muted" id="wallet-addr-label">Alamat dompet TON kamu</div><b id="wallet-addr">Belum terhubung</b></div>
             <span class="pill" id="ton-status">Belum terhubung</span>
@@ -347,8 +372,8 @@
             <button class="btn-amber grow" id="btn-ton-connect">Hubungkan Dompet</button>
             <button class="btn-danger grow" id="btn-ton-disconnect" style="display:none">Putuskan</button>
           </div>
-          <p class="tiny muted" style="margin-top:8px" id="wallet-note">Hubungkan dompet TON asli kamu (Tonkeeper, Wallet di Telegram, MyTonWallet) lewat TON Connect untuk membayar Premium Pass &amp; item Toko Premium dengan Gram asli.</p>
-          <div class="lock-note" style="margin-top:10px" id="ton-verify-note">⚠️ Pembayaran Gram asli sudah bisa dicoba lewat TON Connect, tetapi verifikasi di server belum ada — jadi pemberian item setelah pembayaran masih mengandalkan konfirmasi dari dompetmu di perangkat ini, belum diverifikasi di blockchain oleh server.</div>
+          <p class="tiny muted" style="margin-top:8px" id="wallet-note">Hubungkan dompet TON kamu (Tonkeeper, Wallet di Telegram, MyTonWallet) untuk membayar Premium Pass &amp; item Toko Premium dengan Gram.</p>
+          <div class="lock-note" style="margin-top:10px" id="ton-verify-note">⚠️ Pembayaran Gram sudah bisa dicoba, tetapi verifikasi di server belum ada — jadi pemberian item setelah pembayaran masih mengandalkan konfirmasi dari dompetmu di perangkat ini, belum diverifikasi di blockchain oleh server.</div>
         </div>
 
         <div class="card">
@@ -374,7 +399,7 @@
           <div id="wd-history"></div>
         </div>
 
-        <div class="card">
+        <div class="card" id="shop-card">
           <h2 id="shop-title">💎 Toko Premium</h2>
           <div id="shop-list"></div>
         </div>
@@ -583,9 +608,9 @@ function initTonConnect(){
 }
 function tonConnectWallet(){
   var ui = initTonConnect();
-  if (!ui) { toast(tr("⚠️ TON Connect gagal dimuat — periksa koneksi internet lalu coba lagi", "⚠️ TON Connect failed to load — check your internet connection and try again")); haptic("error"); return; }
+  if (!ui) { toast(tr("⚠️ Dompet gagal dimuat — periksa koneksi internet lalu coba lagi", "⚠️ Wallet failed to load — check your internet connection and try again")); haptic("error"); return; }
   if (tonConnected()) { renderTonWallet(); return; }
-  try { ui.openModal(); } catch(e) { toast(tr("⚠️ Gagal membuka TON Connect", "⚠️ Failed to open TON Connect")); haptic("error"); }
+  try { ui.openModal(); } catch(e) { toast(tr("⚠️ Gagal membuka dompet", "⚠️ Failed to open wallet")); haptic("error"); }
 }
 function tonDisconnectWallet(){
   if (!tonConnectUI) return;
@@ -1125,6 +1150,7 @@ function renderPlots(){
   ensurePlots();
   var g = $("plot-grid"); g.innerHTML = "";
   var t = nowMs();
+  var readyCount = 0;
   for (var i=0;i<S.plots.length;i++) {
     var p = S.plots[i] || null;
     var b = document.createElement("button");
@@ -1134,14 +1160,47 @@ function renderPlots(){
     } else {
       var c = cropById(p.crop);
       var ready = t >= p.readyAt;
+      if (ready) readyCount++;
       var pct = Math.min(100, Math.max(0, (t - p.plantedAt) / (p.readyAt - p.plantedAt) * 100));
       b.className = "plot " + (ready ? "ready" : "growing");
-      b.innerHTML = '<span class="em">' + (ready ? c.em : "🌱") + '</span><b>' + cName(c) + '</b>' +
+      b.id = "plot-" + i;
+      b.innerHTML = (ready ? '<span class="rdy-badge">' + tr("🌾 Siap Panen", "🌾 Ready to Harvest") + '</span>' : '') +
+        '<span class="em">' + (ready ? c.em : "🌱") + '</span><b>' + cName(c) + '</b>' +
         '<span class="cd">' + (ready ? tr("✅ Siap panen!", "✅ Ready to harvest!") : mmss(p.readyAt - t)) + '</span>' +
         '<span class="pbar"><i style="width:' + pct + '%"></i></span>';
     }
     (function(idx){ b.onclick = function(){ plotTap(idx); }; })(i);
     g.appendChild(b);
+  }
+  /* Pemberitahuan "Siap Panen" di atas kartu Kebun Saya — hanya tampil
+     bila ada tanaman yang siap panen, sama seperti info hasil siap di kandang. */
+  var alertEl = $("harvest-alert");
+  if (alertEl) {
+    if (readyCount > 0) {
+      alertEl.textContent = tr("🌾 " + readyCount + " tanaman siap panen!",
+        "🌾 " + readyCount + (readyCount === 1 ? " crop" : " crops") + " ready to harvest!");
+      alertEl.classList.add("show");
+    } else {
+      alertEl.textContent = "";
+      alertEl.classList.remove("show");
+    }
+  }
+}
+/* Ketuk pemberitahuan siap panen → gulir ke petak siap panen pertama
+   dan sorot sebentar. Gulir dibatasi agar tidak melewati akhir konten. */
+function scrollToFirstReadyPlot(){
+  var t = nowMs();
+  for (var i=0;i<S.plots.length;i++) {
+    var p = S.plots[i];
+    if (p && t >= p.readyAt) {
+      var el = $("plot-" + i);
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+        el.classList.add("flash");
+        setTimeout(function(){ el.classList.remove("flash"); }, 1800);
+      }
+      return;
+    }
   }
 }
 function plotTap(i){
@@ -1196,10 +1255,7 @@ function renderPens(){
       ((S.feedStock[type]||0) >= FEED_STOCK_MAX ? tr("Stok Penuh", "Stock Full") : tr("Beli Pakan · ", "Buy Feed · ") + A.feed + " 🪙") + '</button></div>';
     var FR = FEED_RECIPES[type], FRC = cropById(FR.crop), haveCrop = S.inv[FR.crop]||0, stockNow = S.feedStock[type]||0;
     var canMake = haveCrop >= FR.need && stockNow + FR.out <= FEED_STOCK_MAX;
-    html += '<div class="row" style="margin-bottom:6px"><button class="btn-green grow" data-act="makefeed" data-type="' + type + '"' + (canMake ? "" : " disabled") + '>🌱 ' + tr("Buat Pakan", "Make Feed") + ' · ' + FR.need + ' ' + FRC.em + ' → ' + FR.out + ' 🌾</button></div>';
-    html += '<p class="small muted" style="margin-bottom:8px">' + tr("Resep: ", "Recipe: ") + FR.need + ' ' + FRC.em + ' ' + cName(FRC) + ' → ' + FR.out + ' ' + tr("pakan", "feed") + ' · ' + tr("Di gudang: ", "In storage: ") + '<b>' + haveCrop + ' ' + FRC.em + '</b>' + ' · ' + tr("Hemat ", "Save ") + feedSavings(type) + ' 🪙 ' + tr("dibanding beli pakai koin", "vs buying with coins") +
-      (haveCrop < FR.need ? ' · ⚠️ ' + cName(FRC) + tr(" kurang ", " short by ") + (FR.need - haveCrop) + tr(" lagi — panen dulu di Kebun", " more — harvest some in the Garden first") : '') +
-      (stockNow >= FEED_STOCK_MAX ? ' · ' + tr("Stok pakan penuh", "Feed stock full") : (stockNow + FR.out > FEED_STOCK_MAX ? ' · ' + tr("Stok pakan hampir penuh", "Feed stock almost full") : '')) + '</p>';
+    html += '<div class="row" style="margin-bottom:8px"><button class="btn-green grow" data-act="makefeed" data-type="' + type + '"' + (canMake ? "" : " disabled") + '>🌱 ' + tr("Buat Pakan", "Make Feed") + ' · ' + FR.need + ' ' + FRC.em + ' → ' + FR.out + ' 🌾</button></div>';
     html += '<div class="row" style="margin-bottom:8px"><button class="btn-green grow" data-act="feedall" data-type="' + type + '"' + (list.length ? "" : " disabled") + '>🍽️ ' + tr("Beri Pakan Semua", "Feed All") + '</button></div>';
     }
     html += '<div class="row" style="margin-bottom:10px"><button class="btn-green grow" data-act="collectall" data-type="' + type + '"' + (readyCount ? "" : " disabled") + '>🧺 ' + tr("Ambil Semua", "Collect All") + (readyCount ? ' · ' + readyCount + ' ' + A.pem : '') + '</button>' +
@@ -1393,12 +1449,11 @@ function renderPremium(){
     expTxt = d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0");
   }
   var premiumHtml =
-    '<div class="row-between"><h2>👑 Premium Pass</h2><span class="sim-badge" style="background:#7a4fd0">' + tr("Gram Asli · TON Connect", "Real Gram · TON Connect") + '</span></div>' +
+    '<div class="row-between"><h2>👑 Premium Pass</h2></div>' +
     '<div class="row" style="margin:6px 0 2px"><span class="premium-status' + (active ? " on" : "") + '">' +
       (active ? ("✅ " + tr("Aktif", "Active") + " · " + tr("Sisa ", " ") + days + tr(" hari", " days left") + " · " + tr("sampai ", "until ") + expTxt)
               : ("💤 " + tr("Tidak aktif", "Not active"))) + '</span></div>' +
-    '<p class="small" style="margin-top:8px"><b>' + tr("Harga: ", "Price: ") + fmtGram(PREMIUM_PRICE_GRAM) + ' Gram</b> · ' + tr("Durasi ", "Duration ") + PREMIUM_DAYS + tr(" hari", " days") +
-      ' · <span class="muted">' + tr("dibayar dengan Gram asli dari dompet TON kamu lewat TON Connect.", "paid with real Gram from your TON wallet via TON Connect.") + '</span></p>' +
+    '<p class="small" style="margin-top:8px"><b>' + tr("Harga: ", "Price: ") + fmtGram(PREMIUM_PRICE_GRAM) + ' Gram</b> · ' + tr("Durasi ", "Duration ") + PREMIUM_DAYS + tr(" hari", " days") + '</p>' +
     '<ul class="premium-benefits small">' +
       '<li>🌾 ' + tr("Hasil panen 2× — koin dari menjual hasil panen & produk ternak jadi 2× lipat", "2× harvest returns — coins from selling crops & animal products are doubled") + '</li>' +
       '<li>🌱 ' + tr("+1 petak tambahan gratis, di atas batas Balai Kota", "+1 free extra plot, above the Town Hall limit") + '</li>' +
@@ -1407,7 +1462,7 @@ function renderPremium(){
     '<div class="row">' +
       (active
         ? '<button class="btn-amber grow" disabled>👑 ' + tr("Pass Sedang Aktif", "Pass Is Active") + '</button>'
-        : '<button class="btn-amber grow js-buy-premium">' + tr("Beli Premium Pass · ", "Buy Premium Pass · ") + fmtGram(PREMIUM_PRICE_GRAM) + ' Gram (TON Connect)</button>') +
+        : '<button class="btn-amber grow js-buy-premium">' + tr("Beli Premium Pass · ", "Buy Premium Pass · ") + fmtGram(PREMIUM_PRICE_GRAM) + ' Gram</button>') +
     '</div>' +
     (active ? '' : '<p class="tiny muted" style="margin-top:6px">' + tr("Belum punya dompet terhubung? Hubungkan dulu di tab 💎 Gram.", "No wallet connected yet? Connect one first in the 💎 Gram tab.") + '</p>') +
     (active ? '<div class="row" style="margin-top:8px"><button class="btn-green grow js-claim-premium"' + (canClaim ? "" : " disabled") + '>🎁 ' +
@@ -1452,13 +1507,13 @@ function renderGram(){
   } else hist.innerHTML = "";
   var shop = $("shop-list"); shop.innerHTML = "";
   SHOP.forEach(function(it){
-    var d = document.createElement("div"); d.className = "shop-item";
+    var d = document.createElement("div"); d.className = "shop-item"; d.id = "shop-item-" + it.id;
     var priceHtml = it.coins ? '<span class="price-tag">' + fmt(it.coins) + ' 🪙</span>' + tr(" atau ", " or ") + '<span class="gram-price">' + fmtGram(it.gram) + ' Gram</span>'
                              : '<span class="gram-price">' + fmtGram(it.gram) + ' Gram</span>';
     d.innerHTML = '<div class="row-between"><b>' + shopName(it) + '</b><span>' + priceHtml + '</span></div>' +
       '<p class="small muted">' + shopDesc(it) + '</p><div class="row">' +
       (it.coins ? '<button class="btn-small btn-green" data-buy="coins" data-id="' + it.id + '">' + tr("Beli dengan Koin", "Buy with Coins") + '</button>' : '') +
-      '<button class="btn-small btn-amber" data-buy="gram" data-id="' + it.id + '">' + tr("Beli dengan Gram Asli (TON Connect)", "Buy with Real Gram (TON Connect)") + '</button></div>';
+      '<button class="btn-small btn-amber" data-buy="gram" data-id="' + it.id + '">' + tr("Beli dengan Gram", "Buy with Gram") + '</button></div>';
     shop.appendChild(d);
   });
   shop.querySelectorAll("button[data-buy]").forEach(function(b){
@@ -1558,6 +1613,68 @@ function switchTab(name){
 document.querySelectorAll("button[data-tab]").forEach(function(b){
   b.addEventListener("click", function(){ haptic(); switchTab(b.dataset.tab); });
 });
+/* Saldo koin di bar atas ditekan → langsung membuka pembelian koin:
+   pindah ke tab Gram lalu gulir ke Paket Koin di Toko Premium
+   (Paket Koin Kecil / Sedang / Besar) dan sorot paket-paket itu
+   sebentar. Harga paket & cara pembayaran tidak berubah. */
+function openCoinShop(){
+  switchTab("gram");
+  setTimeout(function(){
+    var target = $("shop-item-paket-kecil") || $("shop-card") || $("shop-title");
+    if (target) {
+      /* Gulir SECUKUPNYA saja sampai Paket Koin terlihat — jangan
+         menggulir melewati akhir konten. Cara lama menyelaraskan bagian
+         atas paket ke bawah status bar, yang untuk paket di dekat akhir
+         halaman bisa melewati posisi gulir maksimum; di WebView Telegram
+         itu membuat layar tertarik terlalu jauh (overscroll) dan bagian
+         bawah layar jadi putih/kosong. Sekarang: bila paket belum
+         terlihat, gulir hanya sejauh yang dibutuhkan agar paket tampak
+         di atas tab bar, lalu batasi posisi gulir ke akhir halaman. */
+      var bar = document.querySelector(".statusbar");
+      var topOffset = (bar ? bar.offsetHeight : 110) + 8;
+      var tabbar = document.querySelector(".tabbar");
+      var bottomOffset = (tabbar ? tabbar.offsetHeight : 64) + 52; /* tab bar + ruang badge host */
+      var rect = target.getBoundingClientRect();
+      var viewTop = topOffset;
+      var viewBottom = window.innerHeight - bottomOffset;
+      var curY = window.pageYOffset || 0;
+      var y = curY;
+      if (rect.top < viewTop) {
+        y = curY + (rect.top - viewTop);
+      } else if (rect.bottom > viewBottom) {
+        y = curY + (rect.bottom - viewBottom);
+        var yTopAlign = curY + (rect.top - viewTop);
+        if (y > yTopAlign) y = yTopAlign;
+      }
+      var docEl = document.documentElement;
+      var maxY = Math.max(0, Math.max(docEl.scrollHeight, document.body ? document.body.scrollHeight : 0) - window.innerHeight);
+      if (y > maxY) y = maxY;
+      if (y < 0) y = 0;
+      if (Math.abs(y - curY) > 2) {
+        window.scrollTo({ top: y, behavior: "smooth" });
+        /* Jaga-jaga: bila WebView tetap menarik layar melewati akhir
+           konten setelah gulir halus selesai, tarik kembali ke posisi
+           maksimum agar tidak ada area putih kosong di bawah. */
+        [400, 800].forEach(function(ms){
+          setTimeout(function(){
+            var mY = Math.max(0, Math.max(document.documentElement.scrollHeight, document.body ? document.body.scrollHeight : 0) - window.innerHeight);
+            if ((window.pageYOffset || 0) > mY + 1) window.scrollTo({ top: mY });
+          }, ms);
+        });
+      }
+    }
+    ["paket-kecil","paket-sedang","paket-besar"].forEach(function(id){
+      var el = $("shop-item-" + id);
+      if (el) {
+        el.classList.add("flash");
+        setTimeout(function(){ el.classList.remove("flash"); }, 1800);
+      }
+    });
+  }, 60);
+}
+$("sb-coins-btn").addEventListener("click", function(){ haptic(); openCoinShop(); });
+
+$("harvest-alert").addEventListener("click", function(){ haptic(); scrollToFirstReadyPlot(); });
 
 $("btn-buy-plot").addEventListener("click", function(){
   var max = TH_MAXPLOTS[S.th-1];
@@ -1606,7 +1723,7 @@ $("btn-exchange").addEventListener("click", function(){
 });
 $("btn-withdraw").addEventListener("click", function(){
   if (S.th < 4) { toast(tr("🔒 Butuh Balai Kota Level 4", "🔒 Requires Town Hall Level 4")); haptic("error"); return; }
-  if (!tonConnected()) { toast(tr("Hubungkan dompet TON dulu lewat TON Connect", "Connect your TON wallet via TON Connect first")); haptic("error"); return; }
+  if (!tonConnected()) { toast(tr("Hubungkan dompet TON dulu", "Connect your TON wallet first")); haptic("error"); return; }
   var v = parseFloat($("wd-input").value) || 0;
   if (v < 0.5) { toast(tr("Minimal tarik 0,5 Gram", "Minimum withdrawal is 0.5 Gram")); haptic("error"); return; }
   if (S.gram < v) { toast(tr("💎 Gram tidak cukup", "💎 Not enough Gram")); haptic("error"); return; }
@@ -1668,6 +1785,8 @@ function applyStaticTexts(){
   function setH(id, html){ var el = $(id); if (el) el.innerHTML = html; }
   function setPh(id, txt){ var el = $(id); if (el) el.placeholder = txt; }
   $("btn-music").title = tr("Musik latar", "Background music");
+  var coinsBtn = $("sb-coins-btn");
+  if (coinsBtn) { coinsBtn.title = tr("Beli koin", "Buy coins"); coinsBtn.setAttribute("aria-label", tr("Beli koin", "Buy coins")); }
   set("bk-title", tr("🏛️ Balai Kota — Level", "🏛️ Town Hall — Level"));
   set("bk-stat-plots-now", tr("Petak terbuka di level ini", "Plots unlocked at this level"));
   set("bk-stat-plots-next", tr("Petak di level berikutnya", "Plots at the next level"));
@@ -1686,12 +1805,12 @@ function applyStaticTexts(){
   set("wallet-title", tr("👛 Dompet Gram", "👛 Gram Wallet"));
   set("gram-bal-label", tr("Saldo Gram (dalam game)", "Gram Balance (in-game)"));
   set("gram-bal-note", tr("Saldo ini berasal dari tukar koin & hadiah di dalam game.", "This balance comes from exchanging coins & in-game rewards."));
-  set("ton-title", tr("💎 Dompet TON Asli — TON Connect", "💎 Real TON Wallet — TON Connect"));
+  set("ton-title", tr("💎 Dompet TON", "💎 TON Wallet"));
   set("wallet-addr-label", tr("Alamat dompet TON kamu", "Your TON wallet address"));
   set("btn-ton-connect", tr("Hubungkan Dompet", "Connect Wallet"));
   set("btn-ton-disconnect", tr("Putuskan", "Disconnect"));
-  set("wallet-note", tr("Hubungkan dompet TON asli kamu (Tonkeeper, Wallet di Telegram, MyTonWallet) lewat TON Connect untuk membayar Premium Pass & item Toko Premium dengan Gram asli.", "Connect your real TON wallet (Tonkeeper, Telegram Wallet, MyTonWallet) via TON Connect to pay for the Premium Pass & Premium Shop items with real Gram."));
-  set("ton-verify-note", tr("⚠️ Pembayaran Gram asli sudah bisa dicoba lewat TON Connect, tetapi verifikasi di server belum ada — jadi pemberian item setelah pembayaran masih mengandalkan konfirmasi dari dompetmu di perangkat ini, belum diverifikasi di blockchain oleh server.", "⚠️ Real Gram payments can now be tried via TON Connect, but there is no server verification yet — items are granted based on your wallet's confirmation on this device, not yet verified on the blockchain by a server."));
+  set("wallet-note", tr("Hubungkan dompet TON kamu (Tonkeeper, Wallet di Telegram, MyTonWallet) untuk membayar Premium Pass & item Toko Premium dengan Gram.", "Connect your TON wallet (Tonkeeper, Telegram Wallet, MyTonWallet) to pay for the Premium Pass & Premium Shop items with Gram."));
+  set("ton-verify-note", tr("⚠️ Pembayaran Gram sudah bisa dicoba, tetapi verifikasi di server belum ada — jadi pemberian item setelah pembayaran masih mengandalkan konfirmasi dari dompetmu di perangkat ini, belum diverifikasi di blockchain oleh server.", "⚠️ Gram payments can now be tried, but there is no server verification yet — items are granted based on your wallet's confirmation on this device, not yet verified on the blockchain by a server."));
   set("ex-title", tr("🔄 Tukar Koin → Gram", "🔄 Exchange Coins → Gram"));
   setH("ex-rate", tr("Kurs: <b>10.000 🪙 = 0,01 Gram</b> · Minimal tukar 10.000 🪙", "Rate: <b>10,000 🪙 = 0.01 Gram</b> · Minimum exchange 10,000 🪙"));
   set("btn-exchange", tr("Tukar", "Exchange"));
