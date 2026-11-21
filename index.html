@@ -544,7 +544,7 @@ var ANIMALS = {
   sapi:  {name:"Sapi", nameEn:"Cow",  em:"🐄", buy:350, sellBack:175, thReq:2, cycle:10*60, feed:25, product:"susu",  pem:"🥛", pname:"Susu", pnameEn:"Milk",  psell:15, sound:"Moooo!", soundEn:"Moooo!"},
   domba: {name:"Domba", nameEn:"Sheep", em:"🐑", buy:300, sellBack:150, thReq:3, cycle:15*60, feed:35, product:"wol",   pem:"🧶", pname:"Wol", pnameEn:"Wool",   psell:20, sound:"Mbeeek!", soundEn:"Baaa!"}
 };
-var TH_MAXPLOTS = [3,12,16,20,25];
+var TH_MAXPLOTS = [3,6,9,12,15];
 var TH_UPGRADE  = [0,20000,30000,40000,50000]; /* index = level tujuan */
 /* Syarat level petani untuk naik KE level Town Hall tsb (index = level
    tujuan, sejajar TH_UPGRADE): TH 2→Petani Lv 2, TH 3→Lv 4, TH 4→Lv 6,
@@ -1435,7 +1435,7 @@ function renderTH(){
   if (ginfo) ginfo.textContent = tr("Petak dimiliki: ", "Plots owned: ") + S.plotsOwned + " / " + TH_MAXPLOTS[S.th-1] + tr(" maks di Balai Kota Lv ", " max at Town Hall Lv ") + S.th + (premiumActive() ? tr(" · +1 petak bonus Premium 👑", " · +1 Premium bonus plot 👑") : "");
   var bp = $("btn-buy-plot");
   if (bp) {
-    if (S.plotsOwned >= TH_MAXPLOTS[S.th-1]) { bp.disabled = true; bp.textContent = S.th >= 5 ? tr("Petak Maksimal (25)", "Max Plots (25)") : tr("Petak Penuh — Upgrade Balai Kota", "Plots Full — Upgrade Town Hall"); }
+    if (S.plotsOwned >= TH_MAXPLOTS[S.th-1]) { bp.disabled = true; bp.textContent = S.th >= 5 ? tr("Petak Maksimal (15)", "Max Plots (15)") : tr("Petak Penuh — Upgrade Balai Kota", "Plots Full — Upgrade Town Hall"); }
     else { var price = (S.plotsOwned - 3 + 1) * 1000; bp.disabled = false; bp.textContent = tr("Beli Petak · ", "Buy Plot · ") + fmt(price) + " 🪙"; }
   }
   var ok = S.th >= 4;
