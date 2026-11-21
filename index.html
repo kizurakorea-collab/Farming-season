@@ -227,6 +227,11 @@
         border-radius:10px;padding:8px 12px;display:inline-block}
       .mile{display:flex;align-items:center;gap:9px;border:1px solid var(--line);border-radius:14px;
         padding:10px;margin-bottom:8px;background:var(--card2)}
+      /* Halaman Balai Kota: baris info per level Town Hall */
+      .bk-row{border:1px solid var(--line);border-radius:14px;padding:10px 12px;margin-bottom:8px;background:var(--card2)}
+      .bk-row.cur{border-color:var(--green);background:var(--green-soft)}
+      .bk-row.locked{opacity:.72}
+      .bk-row p{margin:2px 0}
 
       /* toast & modal */
       #toasts{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(122px + var(--host-badge-clearance));z-index:99;
@@ -263,43 +268,30 @@
         <div class="sb-row" style="margin-top:6px">
           <span class="small muted" id="sb-player">Petani</span>
           <span class="small">· Level <b id="sb-level">1</b></span>
-          <span class="small muted grow" id="sb-season"></span>
+          <span class="small muted grow" id="sb-day"></span>
           <span class="small muted"><span id="sb-xp">0</span> XP</span>
         </div>
         <div class="xpbar"><i id="sb-xpbar" style="width:0%"></i></div>
         <div class="top-nav">
           <button class="top-nav-btn" data-tab="premium" id="top-btn-premium"><span class="tic">👑</span><span class="tab-label">Premium</span></button>
+          <button class="top-nav-btn" data-tab="balaikota" id="top-btn-balaikota"><span class="tic">🏛️</span><span class="tab-label">Balai Kota</span></button>
         </div>
       </div>
     </div>
 
     <div class="wrap">
-      <!-- TOWN HALL -->
-      <section class="card" id="townhall-card">
-        <div class="row-between">
-          <h2><span id="th-title">🏛️ Balai Kota — Level</span> <span id="th-level">1</span></h2>
-          <span class="pill" id="th-plots-pill">🌱 3 petak</span>
-        </div>
-        <div class="stat-grid">
-          <div class="stat"><b id="th-max">3</b><span id="th-stat-max">Petak maks level ini</span></div>
-          <div class="stat"><b id="th-owned">3</b><span id="th-stat-owned">Petak dimiliki</span></div>
-          <div class="stat"><b id="th-animals">0</b><span id="th-stat-animals">Hewan ternak</span></div>
-        </div>
-        <div class="row" style="margin-top:10px">
-          <button class="btn-green grow" id="btn-buy-plot">Beli Petak</button>
-          <button class="btn-amber grow" id="btn-upgrade-th">Upgrade Balai Kota</button>
-        </div>
-        <div class="row small" style="margin-top:8px">
-          <span class="muted" id="th-gram-label">💎 Tarik Gram:</span>
-          <b id="th-gram-status">Terkunci — butuh Balai Kota Lv 4</b>
-        </div>
-      </section>
-
       <!-- KEBUN -->
       <section class="tabpage active" id="page-kebun">
         <div class="card">
-          <h2 id="garden-title">🌾 Kebun Saya</h2>
+          <div class="row-between">
+            <h2 id="garden-title">🌾 Kebun Saya</h2>
+            <span class="pill" id="garden-plots-pill">🌱 3 petak</span>
+          </div>
           <div class="plot-grid" id="plot-grid"></div>
+          <div class="row" style="margin-top:10px">
+            <button class="btn-green grow" id="btn-buy-plot">Beli Petak</button>
+          </div>
+          <p class="small muted" id="garden-plots-info" style="margin:6px 0 0"></p>
         </div>
         <div class="card">
           <h2 id="seed-title">🌱 Pilih Benih</h2>
@@ -395,6 +387,33 @@
         </div>
       </section>
 
+      <!-- BALAI KOTA -->
+      <section class="tabpage" id="page-balaikota">
+        <div class="card">
+          <div class="row-between">
+            <h2><span id="bk-title">🏛️ Balai Kota — Level</span> <span id="bk-level">1</span></h2>
+            <span class="pill" id="bk-plots-pill">🌱 3 petak</span>
+          </div>
+          <div class="stat-grid">
+            <div class="stat"><b id="bk-plots-now">3</b><span id="bk-stat-plots-now">Petak terbuka di level ini</span></div>
+            <div class="stat"><b id="bk-plots-next">12</b><span id="bk-stat-plots-next">Petak di level berikutnya</span></div>
+            <div class="stat"><b id="bk-farmer">1</b><span id="bk-stat-farmer">Level petani kamu</span></div>
+          </div>
+          <p class="small" id="bk-upgrade-info" style="margin-top:10px"></p>
+          <button class="btn-amber" id="btn-upgrade-th2" style="width:100%">Upgrade Balai Kota</button>
+          <div class="divider"></div>
+          <div class="row small">
+            <span class="muted" id="bk-gram-label">💎 Tarik Gram:</span>
+            <b id="bk-gram-status">Terkunci — butuh Balai Kota Lv 4</b>
+          </div>
+          <p class="small muted" id="bk-gram-detail" style="margin-top:4px"></p>
+        </div>
+        <div class="card">
+          <h2 id="bk-unlock-title">🔓 Terbuka di Tiap Level Balai Kota</h2>
+          <div id="bk-levels"></div>
+        </div>
+      </section>
+
       <!-- TEMAN -->
       <section class="tabpage" id="page-teman">
         <div class="card">
@@ -469,7 +488,16 @@ var ANIMALS = {
 };
 var TH_MAXPLOTS = [3,12,16,20,25];
 var TH_UPGRADE  = [0,20000,30000,40000,50000]; /* index = level tujuan */
+/* Syarat level petani untuk naik KE level Town Hall tsb (index = level
+   tujuan, sejajar TH_UPGRADE): TH 2→Petani Lv 2, TH 3→Lv 4, TH 4→Lv 6,
+   TH 5→Lv 9. Ditampilkan sebagai info di kartu & halaman Balai Kota. */
+var TH_FARMER_REQ = [0,2,4,6,9];
 var FEED_STOCK_MAX = 20, FED_MAX_MS = 60*60*1000, ANIMAL_MAX = 5;
+/* Tumpukan hasil per hewan: 1 hewan menumpuk MAKSIMAL 5 hasil; begitu
+   sudah 5 hasil yang belum diambil, hewan itu BERHENTI berproduksi
+   (tidak ada hasil ke-6) sampai tumpukannya diambil — lewat tombol
+   Ambil per hewan atau Ambil Semua. Berlaku untuk ayam, sapi, domba. */
+var STACK_MAX = 5;
 /* Resep Buat Pakan dari hasil panen di gudang — dibuat SEDIKIT lebih hemat
    daripada membeli pakan pakai koin:
    Ayam : 2 Wortel  (jual 36 🪙)  → 3 pakan (beli 45 🪙)  = hemat 9 🪙
@@ -612,7 +640,6 @@ var SHOP = [
   {id:"paket-sedang", name:"🪙 Paket Koin Sedang", nameEn:"🪙 Medium Coin Pack", desc:"+300.000 koin. Hanya bisa dibeli dengan Gram.", descEn:"+300,000 coins. Can only be bought with Gram.", coins:0, gram:0.50, give:300000},
   {id:"paket-besar", name:"🪙 Paket Koin Besar", nameEn:"🪙 Large Coin Pack", desc:"+700.000 koin. Hanya bisa dibeli dengan Gram.", descEn:"+700,000 coins. Can only be bought with Gram.", coins:0, gram:1.00, give:700000}
 ];
-var SEASONS = [{id:"🌸 Semi",en:"🌸 Spring"},{id:"☀️ Panas",en:"☀️ Summer"},{id:"🍂 Gugur",en:"🍂 Autumn"},{id:"❄️ Dingin",en:"❄️ Winter"}];
 var SAVE_KEY = "farming-season-mini-app-v1";
 
 /* ================= TELEGRAM ================= */
@@ -782,8 +809,8 @@ function itemInfo(id){
   for (var k in ANIMALS) if (ANIMALS[k].product===id) return {name:pName(ANIMALS[k]), em:ANIMALS[k].pem, sell:ANIMALS[k].psell};
   return {name:id, em:"📦", sell:0};
 }
-function playerLevel(){ return Math.floor(Math.sqrt(S.xp/50)) + 1; }
-function xpForLevel(l){ return (l-1)*(l-1)*50; }
+function playerLevel(){ return Math.floor(Math.sqrt(S.xp/200)) + 1; }
+function xpForLevel(l){ return (l-1)*(l-1)*200; }
 function addXp(n){
   var before = playerLevel(); S.xp += n;
   if (playerLevel() > before) { toast(tr("🎉 Naik ke Level ", "🎉 Reached Level ") + playerLevel() + "!"); haptic("success"); }
@@ -875,12 +902,23 @@ function animalSound(type){
 function nowMs(){ return Date.now(); }
 function isFed(a){ return a.fedUntil && a.fedUntil > nowMs(); }
 function settleAnimal(a){
-  /* perbarui status produksi berdasarkan waktu nyata */
+  /* Perbarui status produksi berdasarkan waktu nyata.
+     Tiap siklus yang selesai selagi hewan kenyang menambah 1 hasil ke
+     tumpukan (a.ready), dan siklus berikutnya langsung berjalan lagi —
+     SAMPAI tumpukan penuh STACK_MAX (5): saat itu timer produksi
+     dihentikan, jadi hewan tidak bisa menambah hasil ke-6 sebelum
+     tumpukannya diambil. */
   var t = nowMs(), A = ANIMALS[a.type];
-  if (a.ready) return;
+  if (typeof a.ready !== "number") a.ready = a.ready ? 1 : 0; /* save lama: ready boolean */
+  if (a.ready >= STACK_MAX) { a.nextAt = null; a.remainingMs = A.cycle*1000; return; }
   if (a.nextAt) {
-    if (t >= a.nextAt && a.fedUntil >= a.nextAt) { a.ready = true; a.nextAt = null; a.remainingMs = A.cycle*1000; }
-    else if (a.fedUntil && t >= a.fedUntil && a.nextAt > a.fedUntil) {
+    while (a.nextAt && t >= a.nextAt && a.fedUntil >= a.nextAt) {
+      a.ready++;
+      if (a.ready >= STACK_MAX) { a.nextAt = null; a.remainingMs = A.cycle*1000; break; }
+      a.nextAt += A.cycle*1000; /* belum penuh: siklus berikutnya langsung mulai */
+      a.remainingMs = A.cycle*1000;
+    }
+    if (a.nextAt && a.fedUntil && t >= a.fedUntil && a.nextAt > a.fedUntil) {
       a.remainingMs = a.nextAt - a.fedUntil; a.nextAt = null; /* lapar: jeda */
     }
   }
@@ -894,7 +932,7 @@ function feedAnimal(a){
   if (cur + add > FED_MAX_MS) { toast(tr("⏱️ Waktu kenyang sudah maksimal 1 jam", "⏱️ Feed time is already at the 1-hour maximum")); haptic("error"); return; }
   S.feedStock[a.type]--;
   a.fedUntil = t + cur + add;
-  if (!a.ready && !a.nextAt) { a.nextAt = t + (a.remainingMs != null ? a.remainingMs : A.cycle*1000); }
+  if (a.ready < STACK_MAX && !a.nextAt) { a.nextAt = t + (a.remainingMs != null ? a.remainingMs : A.cycle*1000); }
   track("feed", 1); addXp(1);
   toast(A.em + " " + aName(A) + " #" + a.num + " " + tr("diberi pakan", "fed")); haptic();
   save(); renderAll();
@@ -919,7 +957,7 @@ function feedAllAnimals(type){
     if (cur + add > FED_MAX_MS) { skippedFull++; return; }
     S.feedStock[type]--;
     a.fedUntil = t + cur + add;
-    if (!a.ready && !a.nextAt) { a.nextAt = t + (a.remainingMs != null ? a.remainingMs : A.cycle*1000); }
+    if (a.ready < STACK_MAX && !a.nextAt) { a.nextAt = t + (a.remainingMs != null ? a.remainingMs : A.cycle*1000); }
     track("feed", 1); addXp(1);
     fed++;
   });
@@ -961,16 +999,22 @@ function makeFeed(type){
   save(); renderAll();
 }
 function collectAnimal(a, silent){
+  /* Ambil SELURUH tumpukan hasil hewan ini (0..STACK_MAX) ke gudang
+     sekaligus. Mengembalikan jumlah hasil yang diambil (0 bila belum
+     ada). Setelah tumpukan kosong, hewan berproduksi lagi: timer yang
+     sedang berjalan dibiarkan, timer yang berhenti karena tumpukan
+     penuh dijalankan lagi bila hewan masih kenyang. */
   var A = ANIMALS[a.type];
-  if (!a.ready) return false;
-  a.ready = false;
-  S.inv[A.product] = (S.inv[A.product]||0) + 1;
+  settleAnimal(a);
+  var n = (typeof a.ready === "number") ? a.ready : (a.ready ? 1 : 0);
+  if (n <= 0) return 0;
+  a.ready = 0;
+  S.inv[A.product] = (S.inv[A.product]||0) + n;
   var t = nowMs();
-  if (isFed(a)) { a.nextAt = t + A.cycle*1000; a.remainingMs = A.cycle*1000; }
-  else { a.nextAt = null; a.remainingMs = A.cycle*1000; }
-  track("collect", 1); addXp(2);
-  if (!silent) { toast(A.pem + " " + pName(A) + " " + tr("diambil", "collected")); haptic("success"); }
-  return true;
+  if (!a.nextAt && isFed(a)) a.nextAt = t + (a.remainingMs != null ? a.remainingMs : A.cycle*1000);
+  track("collect", n); addXp(2*n);
+  if (!silent) { toast(A.pem + " " + n + " " + pName(A) + " " + tr("diambil", "collected")); haptic("success"); }
+  return n;
 }
 
 /* ================= RENDER: STATUS & BALAI KOTA ================= */
@@ -984,26 +1028,69 @@ function renderStatus(){
   $("sb-player").textContent = tgUserName ? (tr("👋 Halo, ", "👋 Hello, ") + tgUserName) : tr("👨‍🌾 Petani", "👨‍🌾 Farmer");
   var start = new Date(S.startDate + "T00:00:00");
   var days = Math.max(0, Math.floor((new Date(todayStr()+"T00:00:00") - start)/86400000));
-  var season = SEASONS[Math.floor(days/3) % 4];
-  $("sb-season").textContent = tr("Hari ke-", "Day ") + (days+1) + " · " + season[LANG];
+  $("sb-day").textContent = tr("Hari ke-", "Day ") + (days+1);
   $("btn-music").textContent = S.musicOn ? "🎵" : "🔇";
 }
 function renderTH(){
-  $("th-level").textContent = S.th;
-  $("th-max").textContent = TH_MAXPLOTS[S.th-1];
-  $("th-owned").textContent = effectivePlots();
-  $("th-plots-pill").textContent = "🌱 " + effectivePlots() + " " + tr("petak", "plots") + (premiumActive() ? " 👑" : "");
-  $("th-animals").textContent = S.animals.length;
+  var pill = $("garden-plots-pill");
+  if (pill) pill.textContent = "🌱 " + effectivePlots() + " " + tr("petak", "plots") + (premiumActive() ? " 👑" : "");
+  var ginfo = $("garden-plots-info");
+  if (ginfo) ginfo.textContent = tr("Petak dimiliki: ", "Plots owned: ") + S.plotsOwned + " / " + TH_MAXPLOTS[S.th-1] + tr(" maks di Balai Kota Lv ", " max at Town Hall Lv ") + S.th + (premiumActive() ? tr(" · +1 petak bonus Premium 👑", " · +1 Premium bonus plot 👑") : "");
   var bp = $("btn-buy-plot");
-  if (S.plotsOwned >= TH_MAXPLOTS[S.th-1]) { bp.disabled = true; bp.textContent = S.th >= 5 ? tr("Petak Maksimal (25)", "Max Plots (25)") : tr("Petak Penuh — Upgrade Balai Kota", "Plots Full — Upgrade Town Hall"); }
-  else { var price = (S.plotsOwned - 3 + 1) * 1000; bp.disabled = false; bp.textContent = tr("Beli Petak · ", "Buy Plot · ") + fmt(price) + " 🪙"; }
-  var up = $("btn-upgrade-th");
-  if (S.th >= 5) { up.disabled = true; up.textContent = tr("Balai Kota Level Maksimal (5)", "Town Hall at Max Level (5)"); }
-  else { up.disabled = false; up.textContent = tr("Upgrade ke Lv ", "Upgrade to Lv ") + (S.th+1) + " · " + fmt(TH_UPGRADE[S.th]) + " 🪙"; }
+  if (bp) {
+    if (S.plotsOwned >= TH_MAXPLOTS[S.th-1]) { bp.disabled = true; bp.textContent = S.th >= 5 ? tr("Petak Maksimal (25)", "Max Plots (25)") : tr("Petak Penuh — Upgrade Balai Kota", "Plots Full — Upgrade Town Hall"); }
+    else { var price = (S.plotsOwned - 3 + 1) * 1000; bp.disabled = false; bp.textContent = tr("Beli Petak · ", "Buy Plot · ") + fmt(price) + " 🪙"; }
+  }
   var ok = S.th >= 4;
-  $("th-gram-status").textContent = ok ? tr("Terbuka ✓ (min. tarik 0,5 Gram)", "Unlocked ✓ (min. withdrawal 0.5 Gram)") : tr("Terkunci — butuh Balai Kota Lv 4", "Locked — requires Town Hall Lv 4");
   $("withdraw-lock").style.display = ok ? "none" : "block";
   $("withdraw-form").style.display = ok ? "block" : "none";
+}
+
+/* ================= RENDER: HALAMAN BALAI KOTA =================
+   Halaman info Town Hall dari tombol atas 🏛️ Balai Kota: level sekarang,
+   harga + syarat upgrade, petak level ini & berikutnya, yang terbuka di
+   tiap level, dan status Tarik Gram. Ini satu-satunya tempat info
+   Town Hall tampil; tombol Upgradenya memakai fungsi upgradeTH(). */
+var bkListTh = 0; /* daftar per level hanya digambar ulang bila TH berubah */
+function renderBalaiKota(){
+  if (!$("bk-level")) return;
+  $("bk-level").textContent = S.th;
+  $("bk-plots-pill").textContent = "🌱 " + effectivePlots() + " " + tr("petak", "plots") + (premiumActive() ? " 👑" : "");
+  $("bk-plots-now").textContent = TH_MAXPLOTS[S.th-1];
+  $("bk-plots-next").textContent = S.th >= 5 ? "—" : TH_MAXPLOTS[S.th];
+  $("bk-farmer").textContent = playerLevel();
+  var info = $("bk-upgrade-info"), up2 = $("btn-upgrade-th2");
+  if (S.th >= 5) {
+    info.textContent = tr("Balai Kota sudah di level maksimal (5) — semua petak, tanaman, hewan, dan Tarik Gram sudah terbuka.", "Town Hall is at the maximum level (5) — all plots, crops, animals, and Gram withdrawal are unlocked.");
+    up2.disabled = true; up2.textContent = tr("Balai Kota Level Maksimal (5)", "Town Hall at Max Level (5)");
+  } else {
+    var target = S.th + 1, req = TH_FARMER_REQ[S.th], mine = playerLevel();
+    info.textContent = tr("Upgrade ke Level ", "Upgrade to Level ") + target + ": " + fmt(TH_UPGRADE[S.th]) + " 🪙 · " +
+      tr("Syarat level petani: Lv ", "Farmer level required: Lv ") + req + " · " +
+      tr("Level kamu: Lv ", "Your level: Lv ") + mine + (mine >= req ? " ✓" : "");
+    up2.disabled = false; up2.textContent = tr("Upgrade ke Lv ", "Upgrade to Lv ") + target + " · " + fmt(TH_UPGRADE[S.th]) + " 🪙";
+  }
+  var ok = S.th >= 4;
+  $("bk-gram-status").textContent = ok ? tr("Terbuka ✓ (min. tarik 0,5 Gram)", "Unlocked ✓ (min. withdrawal 0.5 Gram)") : tr("Terkunci — butuh Balai Kota Lv 4", "Locked — requires Town Hall Lv 4");
+  $("bk-gram-detail").textContent = tr("Saldo Gram kamu: 💎 ", "Your Gram balance: 💎 ") + fmtGram(S.gram) + " · " +
+    tr("Minimal tarik 0,5 Gram", "Minimum withdrawal 0.5 Gram") + (ok ? "" : tr(" · Terbuka di Balai Kota Lv 4", " · Unlocks at Town Hall Lv 4"));
+  if (bkListTh !== S.th) {
+    bkListTh = S.th;
+    var html = "";
+    for (var L = 1; L <= 5; L++) {
+      var crops = CROPS.filter(function(c){ return (c.thReq || 1) === L; });
+      var animals = Object.keys(ANIMALS).filter(function(k){ return ANIMALS[k].thReq === L; });
+      var badge = L === S.th ? " · <b>" + tr("level kamu", "your level") + "</b>" : (L < S.th ? " ✓" : " 🔒");
+      html += '<div class="bk-row' + (L === S.th ? " cur" : (L > S.th ? " locked" : "")) + '">' +
+        "<b>🏛️ " + tr("Level ", "Level ") + L + "</b>" + badge +
+        '<p class="small">🌱 ' + tr("Petak maks: ", "Max plots: ") + "<b>" + TH_MAXPLOTS[L-1] + "</b></p>" +
+        '<p class="small">🌾 ' + tr("Tanaman: ", "Crops: ") + (crops.length ? crops.map(function(c){ return c.em + " " + cName(c); }).join(", ") : "—") + "</p>" +
+        '<p class="small">🐾 ' + tr("Hewan: ", "Animals: ") + (animals.length ? animals.map(function(k){ return ANIMALS[k].em + " " + aName(ANIMALS[k]); }).join(", ") : "—") + "</p>" +
+        (L === 4 ? '<p class="small">💎 ' + tr("Tarik Gram terbuka (min. 0,5 Gram)", "Gram withdrawal unlocks (min. 0.5 Gram)") + "</p>" : "") +
+        "</div>";
+    }
+    $("bk-levels").innerHTML = html;
+  }
 }
 
 /* ================= RENDER: KEBUN ================= */
@@ -1092,7 +1179,8 @@ function renderPens(){
     var A = ANIMALS[type];
     var list = S.animals.filter(function(a){ return a.type === type; });
     list.forEach(settleAnimal);
-    var readyCount = list.filter(function(a){ return a.ready; }).length;
+    var readyCount = list.reduce(function(s2,a){ return s2 + (a.ready||0); }, 0); /* total hasil menumpuk di kandang */
+    var readyAnimalsN = list.filter(function(a){ return a.ready > 0; }).length;
     var locked = S.th < (A.thReq || 1);
     var card = document.createElement("div"); card.className = "card";
     var html = '<div class="row-between"><h2>' + (type==="ayam"?(animalIcon("ayam") + " " + tr("Kandang Ayam", "Chicken Pen")):type==="sapi"?("🐄 " + tr("Kandang Sapi", "Cow Pen")):("🐑 " + tr("Kandang Domba", "Sheep Pen"))) + (locked ? ' 🔒' : '') + '</h2>' +
@@ -1116,7 +1204,7 @@ function renderPens(){
     }
     html += '<div class="row" style="margin-bottom:10px"><button class="btn-green grow" data-act="collectall" data-type="' + type + '"' + (readyCount ? "" : " disabled") + '>🧺 ' + tr("Ambil Semua", "Collect All") + (readyCount ? ' · ' + readyCount + ' ' + A.pem : '') + '</button>' +
       '<button class="btn-amber grow" data-act="buyanimal" data-type="' + type + '"' + ((locked || list.length >= ANIMAL_MAX) ? " disabled" : "") + '>' + (locked ? ('🔒 TH ' + A.thReq) : ((type === "ayam" ? animalIcon("ayam") + " " : "") + tr("Beli ", "Buy ") + aName(A) + ' · ' + fmt(A.buy) + ' 🪙')) + '</button></div>';
-    if (readyCount) html += '<p class="small muted">' + tr('Ada ' + readyCount + ' produk siap dari ' + list.filter(function(a){return a.ready;}).length + ' hewan di kandang ini.', readyCount + ' products ready from ' + list.filter(function(a){return a.ready;}).length + ' animals in this pen.') + '</p>';
+    if (readyCount) html += '<p class="small muted">' + tr('Ada ' + readyCount + ' produk siap dari ' + readyAnimalsN + ' hewan di kandang ini.', readyCount + ' products ready from ' + readyAnimalsN + ' animals in this pen.') + '</p>';
     html += '<div id="cards-' + type + '"></div>';
     card.innerHTML = html;
     wrap.appendChild(card);
@@ -1126,8 +1214,8 @@ function renderPens(){
       var el = document.createElement("div");
       el.className = "animal"; el.dataset.uid = a.uid;
       el.innerHTML = '<span class="bubble"></span><span class="nm">' + aName(A) + ' #' + a.num + '</span>' +
-        '<span class="em">' + A.em + '</span>' + (a.ready ? '<span class="rdy">' + A.pem + '</span>' : '') +
-        '<span class="abar' + (a.ready ? " full" : "") + '"><i style="width:' + animalProgress(a) + '%"></i></span>';
+        '<span class="em">' + A.em + '</span>' + (a.ready > 0 ? '<span class="rdy">' + A.pem + (a.ready > 1 ? '×' + a.ready : '') + '</span>' : '') +
+        '<span class="abar' + (a.ready >= STACK_MAX ? " full" : "") + '"><i style="width:' + animalProgress(a) + '%"></i></span>';
       if (!penPos[a.uid]) penPos[a.uid] = { x: 15 + (idx*23)%70, y: 42 + (idx*17)%34, vx: (Math.random()<.5?-1:1)*(0.05+Math.random()*0.05), vy: (Math.random()<.5?-1:1)*0.03 };
       el.style.left = penPos[a.uid].x + "%"; el.style.top = penPos[a.uid].y + "%";
       el.onclick = function(){ tapAnimal(a, el); };
@@ -1140,12 +1228,13 @@ function renderPens(){
       d.className = "animal-card" + (S.selAnimal === a.uid ? " hl" : "");
       d.id = "acard-" + a.uid;
       var fed = isFed(a);
-      var status = a.ready ? (A.pem + " " + tr("Siap diambil!", "Ready to collect!")) : (!fed && !a.nextAt ? tr("😋 Lapar — beri pakan untuk produksi", "😋 Hungry — feed it to produce") : tr("Sedang produksi", "Producing"));
-      var nextTxt = a.ready ? tr("Siap!", "Ready!") : (a.nextAt ? mmss(a.nextAt - nowMs()) : "—");
+      var full = a.ready >= STACK_MAX;
+      var status = full ? (A.pem + " " + tr("Penuh " + a.ready + "/" + STACK_MAX + " — ambil dulu agar produksi lagi", "Full " + a.ready + "/" + STACK_MAX + " — collect to resume production")) : (a.ready > 0 ? (A.pem + " " + a.ready + "/" + STACK_MAX + " " + tr("Siap diambil!", "Ready to collect!")) : (!fed && !a.nextAt ? tr("😋 Lapar — beri pakan untuk produksi", "😋 Hungry — feed it to produce") : tr("Sedang produksi", "Producing")));
+      var nextTxt = full ? tr("Penuh!", "Full!") : (a.nextAt ? mmss(a.nextAt - nowMs()) : (a.ready > 0 ? tr("Siap!", "Ready!") : "—"));
       var fedTxt = fed ? mmss(a.fedUntil - nowMs()) : tr("Habis", "None");
       d.innerHTML = '<div class="row-between"><b>' + animalIcon(a.type) + ' ' + aName(A) + ' #' + a.num + '</b><span class="small">' + status + '</span></div>' +
         '<div class="row small" style="margin:5px 0"><span>⏱️ ' + tr("Produk berikutnya: ", "Next product: ") + '<span class="cd">' + nextTxt + '</span></span><span>🌾 ' + tr("Sisa kenyang: ", "Feed left: ") + '<span class="cd">' + fedTxt + '</span></span></div>' +
-        '<div class="row"><button class="btn-green btn-small" data-act="collect" data-uid="' + a.uid + '"' + (a.ready ? "" : " disabled") + '>' + tr("Ambil ", "Collect ") + A.pem + '</button>' +
+        '<div class="row"><button class="btn-green btn-small" data-act="collect" data-uid="' + a.uid + '"' + (a.ready > 0 ? "" : " disabled") + '>' + tr("Ambil ", "Collect ") + A.pem + ' ' + (a.ready||0) + '/' + STACK_MAX + '</button>' +
         '<button class="btn-amber btn-small" data-act="feed" data-uid="' + a.uid + '">' + tr("Beri Pakan", "Feed") + '</button>' +
         '<button class="btn-danger btn-small" data-act="sell" data-uid="' + a.uid + '">' + (a.type === "ayam" ? animalIcon("ayam") + " " : "") + tr("Jual ", "Sell ") + aName(A) + ' #' + a.num + ' · +' + fmt(A.sellBack) + ' 🪙</button></div>';
       cwrap.appendChild(d);
@@ -1166,11 +1255,11 @@ function renderPens(){
         if (S.animals.filter(function(x){return x.type===type;}).length >= ANIMAL_MAX) return;
         if (!spendCoins(A.buy)) { renderStatus(); return; }
         S.animalSeq[type]++;
-        S.animals.push({ uid: "a" + Date.now() + "_" + type + S.animalSeq[type], type: type, num: S.animalSeq[type], fedUntil: 0, nextAt: null, remainingMs: A.cycle*1000, ready: false });
+        S.animals.push({ uid: "a" + Date.now() + "_" + type + S.animalSeq[type], type: type, num: S.animalSeq[type], fedUntil: 0, nextAt: null, remainingMs: A.cycle*1000, ready: 0 });
         toast(A.em + " " + aName(A) + " #" + S.animalSeq[type] + tr(" dibeli — beri pakan agar berproduksi", " bought — feed it so it can produce")); haptic("success"); save(); renderAll();
       } else if (act === "collectall") {
         var n = 0;
-        S.animals.forEach(function(x){ if (x.type === type && x.ready) { if (collectAnimal(x, true)) n++; } });
+        S.animals.forEach(function(x){ if (x.type === type && x.ready > 0) { n += collectAnimal(x, true); } });
         if (n) { toast(tr("🧺 " + n + " produk diambil dari kandang", "🧺 " + n + " products collected from the pen")); haptic("success"); save(); renderAll(); }
       } else if (act === "feed" && a) feedAnimal(a);
       else if (act === "makefeed") makeFeed(type);
@@ -1188,7 +1277,7 @@ function renderPens(){
   });
 }
 function animalProgress(a){
-  if (a.ready) return 100;
+  if (a.ready >= STACK_MAX) return 100;
   var A = ANIMALS[a.type];
   if (a.nextAt) { var total = A.cycle*1000; var left = a.nextAt - nowMs(); return Math.min(100, Math.max(0, (1 - left/total) * 100)); }
   if (a.remainingMs != null) return Math.min(100, Math.max(0, (1 - a.remainingMs/(A.cycle*1000)) * 100));
@@ -1438,7 +1527,7 @@ function renderFriends(){
   var badge = $("badge-teman");
   badge.style.display = claimable ? "flex" : "none"; badge.textContent = claimable;
   var tb = $("badge-ternak");
-  var readyAnimals = S.animals.filter(function(a){ return a.ready; }).length;
+  var readyAnimals = S.animals.filter(function(a){ return a.ready > 0; }).length;
   tb.style.display = readyAnimals ? "flex" : "none"; tb.textContent = readyAnimals;
 }
 
@@ -1447,13 +1536,13 @@ function renderAll(){
   ensureDaily();
   ensurePlots();
   S.animals.forEach(settleAnimal);
-  renderStatus(); renderTH(); renderSeeds(); renderPlots(); renderPens();
+  renderStatus(); renderTH(); renderBalaiKota(); renderSeeds(); renderPlots(); renderPens();
   renderMarket(); renderMissions(); renderGram(); renderFriends();
 }
 /* render ringan tiap detik: hanya hitung mundur & status */
 function tickRender(){
   S.animals.forEach(settleAnimal);
-  renderStatus(); renderTH(); renderPlots(); renderPens(); renderMissions(); renderFriends(); renderPremium();
+  renderStatus(); renderTH(); renderBalaiKota(); renderPlots(); renderPens(); renderMissions(); renderFriends(); renderPremium();
 }
 </script>
 
@@ -1479,14 +1568,17 @@ $("btn-buy-plot").addEventListener("click", function(){
   toast(tr("🌱 Petak baru dibeli · total " + S.plotsOwned + " petak", "🌱 New plot bought · " + S.plotsOwned + " plots total")); haptic("success");
   save(); renderAll();
 });
-$("btn-upgrade-th").addEventListener("click", function(){
+/* Upgrade Town Hall — dipakai tombol di halaman Balai Kota;
+   perilaku & harga sama persis seperti sebelumnya. */
+function upgradeTH(){
   if (S.th >= 5) return;
   var cost = TH_UPGRADE[S.th];
   if (!spendCoins(cost)) { renderStatus(); return; }
   S.th++;
   toast(tr("🏛️ Balai Kota naik ke Level " + S.th + " · petak maks " + TH_MAXPLOTS[S.th-1], "🏛️ Town Hall upgraded to Level " + S.th + " · max plots " + TH_MAXPLOTS[S.th-1])); haptic("success");
   save(); renderAll();
-});
+}
+$("btn-upgrade-th2").addEventListener("click", upgradeTH);
 $("btn-sell-all").addEventListener("click", function(){
   var total = 0, count = 0;
   Object.keys(S.inv).forEach(function(id){
@@ -1576,11 +1668,12 @@ function applyStaticTexts(){
   function setH(id, html){ var el = $(id); if (el) el.innerHTML = html; }
   function setPh(id, txt){ var el = $(id); if (el) el.placeholder = txt; }
   $("btn-music").title = tr("Musik latar", "Background music");
-  set("th-title", tr("🏛️ Balai Kota — Level", "🏛️ Town Hall — Level"));
-  set("th-stat-max", tr("Petak maks level ini", "Max plots at this level"));
-  set("th-stat-owned", tr("Petak dimiliki", "Plots owned"));
-  set("th-stat-animals", tr("Hewan ternak", "Livestock"));
-  set("th-gram-label", tr("💎 Tarik Gram:", "💎 Withdraw Gram:"));
+  set("bk-title", tr("🏛️ Balai Kota — Level", "🏛️ Town Hall — Level"));
+  set("bk-stat-plots-now", tr("Petak terbuka di level ini", "Plots unlocked at this level"));
+  set("bk-stat-plots-next", tr("Petak di level berikutnya", "Plots at the next level"));
+  set("bk-stat-farmer", tr("Level petani kamu", "Your farmer level"));
+  set("bk-gram-label", tr("💎 Tarik Gram:", "💎 Withdraw Gram:"));
+  set("bk-unlock-title", tr("🔓 Terbuka di Tiap Level Balai Kota", "🔓 Unlocked at Each Town Hall Level"));
   set("garden-title", tr("🌾 Kebun Saya", "🌾 My Garden"));
   set("seed-title", tr("🌱 Pilih Benih", "🌱 Choose Seeds"));
   set("seed-help", tr("Ketuk benih, lalu ketuk petak kosong untuk menanam. Ketuk tanaman yang siap untuk memanen.", "Tap a seed, then tap an empty plot to plant it. Tap a ready crop to harvest it."));
@@ -1624,13 +1717,16 @@ function applyStaticTexts(){
   setH("redeem-desc", tr("Masukkan kode undangan teman untuk bonus sambutan <b>+150 🪙 +25 XP</b> (sekali pakai).", "Enter a friend's invite code for a welcome bonus of <b>+150 🪙 +25 XP</b> (one-time)."));
   set("btn-redeem", tr("Tukar Kode", "Redeem Code"));
   set("footer-note", tr("Progres tersimpan otomatis di perangkat ini.", "Progress is saved automatically on this device."));
-  var tabNames = { kebun: tr("Kebun", "Garden"), ternak: tr("Ternak", "Livestock"), pasar: tr("Pasar", "Market"), misi: tr("Misi", "Missions"), gram: "Gram", premium: "Premium", teman: tr("Teman", "Friends") };
+  var tabNames = { kebun: tr("Kebun", "Garden"), ternak: tr("Ternak", "Livestock"), pasar: tr("Pasar", "Market"), misi: tr("Misi", "Missions"), gram: "Gram", premium: "Premium", balaikota: tr("Balai Kota", "Town Hall"), teman: tr("Teman", "Friends") };
   document.querySelectorAll("button[data-tab]").forEach(function(b){
     var s = b.querySelector(".tab-label"); if (s && tabNames[b.dataset.tab]) s.textContent = tabNames[b.dataset.tab];
   });
 }
 /* ================= INIT ================= */
 loadState();
+/* Migrasi save lama: 'ready' hewan dulu boolean (maks 1 hasil per hewan) —
+   sekarang angka tumpukan hasil 0..STACK_MAX (maks 5 per hewan). */
+S.animals.forEach(function(a){ a.ready = (typeof a.ready === "number") ? Math.max(0, Math.min(STACK_MAX, Math.floor(a.ready))) : (a.ready ? 1 : 0); });
 applyStaticTexts();
 ensureDaily();
 /* normalisasi petak (termasuk +1 petak Premium Pass bila aktif) */
