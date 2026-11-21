@@ -573,22 +573,29 @@ var STACK_MAX = 5;
    Penambang dibeli 1.000 koin (maks 3), dijual kembali 500 koin. Tiap
    penambang bekerja sendiri: 1 Batu tiap 30 menit, menumpuk sampai
    5 Batu (STACK_MAX, sama seperti tumpukan ternak) lalu berhenti
-   sampai diambil. Penambang TIDAK butuh makan (tanpa sistem pakan),
-   tetapi ada BIAYA PERAWATAN 10 koin per penambang yang dibayar
-   MANUAL lewat tombol "🔧 Bayar Perawatan · 10 koin" di kartu tiap
-   penambang: TIDAK ada potongan otomatis — koin pemain tidak pernah
-   berkurang tanpa pemain menekan tombol itu. Sekali bayar, penambang
-   bekerja selama 1 jam ke depan; bila masa perawatan itu habis dan
-   belum dibayar lagi, penambang JEDA berproduksi sampai pemain
-   menekan tombol Bayar Perawatan lagi. Batu masuk gudang sebagai
-   item "bijih" (kunci simpan lama, nama tampilannya "Batu") dan
-   dijual di Pasar 25 koin — harga normal untuk semua pemain,
-   tanpa pengganda Premium. */
+   sampai diambil. Penambang TIDAK butuh makan (tanpa sistem pakan).
+   Setiap penambang bekerja memakai KAPAK BATU (🪓) yang SUDAH
+   TERMASUK saat penambang dibeli: kapak punya DAYA TAHAN AXE_MAX
+   (20) dan berkurang 1 setiap 1 Batu selesai ditambang — jadi 1
+   kapak penuh cukup untuk 20 Batu = 10 jam menambang. Bila daya
+   tahan habis (0), kapak RUSAK dan penambang berhenti sampai
+   kapaknya DIPERBAIKI lewat tombol "🔨 Perbaiki Kapak" di kartunya:
+   biaya perbaikan AXE_REPAIR_PER (5 koin) per 1 daya tahan yang
+   hilang, dan perbaikan selalu mengembalikan kapak ke PENUH —
+   perbaiki dari rusak total = 100 koin (setara biaya lama
+   10 koin/jam, jadi untung bersih penambang tetap +40 koin/jam).
+   Perbaikan bisa dilakukan kapan saja selama daya tahan belum
+   penuh, tidak harus menunggu rusak. TIDAK ada potongan otomatis —
+   koin pemain hanya berkurang saat tombol Perbaiki ditekan. Batu
+   masuk gudang sebagai item "bijih" (kunci simpan lama, nama
+   tampilannya "Batu") dan dijual di Pasar 25 koin — harga normal
+   untuk semua pemain, tanpa pengganda Premium. */
+var MINE_TRIAL_OPEN = false; /* Uji coba selesai (21 Nov 2026): tambang kembali TERKUNCI sampai Balai Kota Lv 4 seperti semula */
 var MINER_BUY = 1000, MINER_SELLBACK = 500, MINER_MAX = 3;
 var MINER_CYCLE = 30*60; /* detik per 1 Batu */
 var ORE_SELL = 25; /* harga jual 1 Batu di Pasar */
-var MINER_UPKEEP = 10; /* biaya perawatan per penambang, dibayar manual per 1 jam kerja */
-var MINER_UPKEEP_MS = 60*60*1000; /* 1 jam dalam ms — masa kerja per 1× pembayaran perawatan */
+var AXE_MAX = 20; /* daya tahan penuh Kapak Batu — 1 daya tahan = 1 Batu (20 Batu = 10 jam) */
+var AXE_REPAIR_PER = 5; /* biaya perbaikan per 1 daya tahan — perbaiki dari 0 ke penuh = 100 koin */
 /* Resep Buat Pakan dari hasil panen di gudang (resep tidak berubah;
    angka "hemat" dihitung dari harga beli pakan saat ini):
    Ayam : 2 Wortel  (jual 36 🪙)  → 3 pakan (beli 45 🪙)  = hemat 9 🪙
@@ -864,7 +871,7 @@ function freshState() {
     seedStock: {}, /* cropId -> jumlah benih yang dimiliki pemain (dibeli di Toko Benih, dipakai saat menanam) */
     inv: {}, /* itemId -> jumlah (tanaman + telur/susu/wol) */
     animals: [], /* {uid,type,num,fedUntil,nextAt,remainingMs,ready} */
-    miners: [], /* {uid,num,nextAt,remainingMs,ready,upkeepUntil,upkeepRemainingMs,pausedUpkeep} — penambang tambang (TH Lv 4); upkeepUntil = batas masa perawatan berbayar (manual), upkeepRemainingMs = sisa masa berbayar yang dibekukan saat tumpukan penuh, pausedUpkeep = jeda karena masa perawatan habis/belum dibayar */
+    miners: [], /* {uid,num,nextAt,remainingMs,ready,axe} — penambang tambang (TH Lv 4); axe = sisa daya tahan Kapak Batu (0..AXE_MAX), berkurang 1 per Batu; 0 = kapak rusak, penambang berhenti sampai diperbaiki */
     minerSeq: 0,
     feedStock: {ayam:0, sapi:0, domba:0},
     mixFeedStock: 0, /* stok Pakan Campuran Ayam (khusus ayam, maks FEED_STOCK_MAX) */
@@ -1237,165 +1244,124 @@ function collectAnimal(a, silent){
    30 menit yang selesai menambah 1 Batu ke tumpukan penambang itu
    (m.ready), SAMPAI tumpukan penuh STACK_MAX (5): saat itu timer
    berhenti dan tidak ada Batu ke-6 sampai tumpukannya diambil.
-   BIAYA PERAWATAN — MANUAL, TIDAK ADA POTONGAN OTOMATIS: fungsi ini
-   TIDAK PERNAH mengurangi koin pemain. Penambang hanya bekerja
-   selama masa perawatan yang sudah DIBAYAR lewat tombol
-   "🔧 Bayar Perawatan · 10 koin" di kartunya (m.upkeepUntil =
-   batas akhir masa berbayar; 1× bayar = 1 jam kerja). Bila masa
-   itu habis, penambang JEDA (pausedUpkeep): timer produksinya
-   dibekukan di tempat sampai pemain menekan tombol Bayar
-   Perawatan lagi. Tombol itu hanya aktif saat masa perawatan
-   habis (sedang jeda); selama masa berbayar masih tersisa, tombol
-   nonaktif dan menampilkan sisa waktunya. Saat tumpukan penuh,
-   sisa masa berbayar ikut dibekukan (m.upkeepRemainingMs) agar
-   tidak hangus selagi penambang berhenti karena penuh. */
-/* Sisa masa perawatan berbayar penambang ini dalam ms (0 = habis/jeda). */
-function minerPaidMs(m, t){
-  if (m.upkeepUntil) return Math.max(0, m.upkeepUntil - t);
-  if (typeof m.upkeepRemainingMs === "number" && m.upkeepRemainingMs > 0) return m.upkeepRemainingMs;
-  return 0;
-}
-/* Format sisa masa perawatan, mis. "42 menit lagi" / "1 jam 5 menit lagi". */
-function fmtPaidLeft(ms){
-  var totalMin = Math.max(1, Math.ceil(ms/60000));
-  if (totalMin >= 60) {
-    var h = Math.floor(totalMin/60), mm = totalMin % 60;
-    return tr(h + " jam" + (mm ? " " + mm + " menit" : "") + " lagi", h + "h" + (mm ? " " + mm + "m" : "") + " left");
-  }
-  return tr(totalMin + " menit lagi", totalMin + " min left");
+   KAPAK BATU — fungsi ini TIDAK PERNAH mengurangi koin pemain.
+   Setiap Batu yang selesai mengurangi daya tahan kapak (m.axe) 1;
+   kapak penuh = AXE_MAX (20) daya tahan = 20 Batu = 10 jam kerja.
+   Daya tahan TIDAK berkurang selagi penambang berhenti (tumpukan
+   penuh atau game ditutup tanpa siklus yang selesai). Bila daya
+   tahan habis (0), kapak RUSAK: penambang berhenti dan timernya
+   dibekukan sampai pemain menekan tombol "🔨 Perbaiki Kapak" —
+   perbaikan mengembalikan daya tahan ke penuh dengan biaya
+   AXE_REPAIR_PER per daya tahan yang hilang. */
+/* Biaya memperbaiki kapak penambang ini ke penuh (0 bila sudah penuh). */
+function axeRepairCost(m){
+  var missing = AXE_MAX - (typeof m.axe === "number" ? m.axe : AXE_MAX);
+  return Math.max(0, missing) * AXE_REPAIR_PER;
 }
 function settleMiner(m){
   var t = nowMs();
   if (typeof m.ready !== "number") m.ready = m.ready ? 1 : 0; /* save lama */
-  /* Migrasi save lama (perawatan potong otomatis, field upkeepNextAt):
-     sisa jam kerja yang sedang berjalan dianggap masa berbayar sampai
-     batasnya — TANPA memotong koin apa pun; setelah itu penambang jeda
-     dan menunggu pembayaran manual. Penambang yang dulu jeda karena
-     koin tidak cukup tetap jeda dengan masa berbayar 0. */
-  if ("upkeepNextAt" in m) {
-    if (m.pausedUpkeep) { m.upkeepUntil = null; m.upkeepRemainingMs = 0; }
-    else if (m.upkeepNextAt) { m.upkeepUntil = m.upkeepNextAt; m.upkeepRemainingMs = 0; }
-    else { m.upkeepUntil = null; if (typeof m.upkeepRemainingMs !== "number" || isNaN(m.upkeepRemainingMs)) m.upkeepRemainingMs = 0; }
-    delete m.upkeepNextAt;
+  /* Migrasi save lama (sistem biaya perawatan manual): sisa masa
+     perawatan berbayar yang belum terpakai diubah jadi daya tahan
+     kapak — tiap 30 menit masa berbayar = 1 daya tahan, dibulatkan
+     ke atas, maks AXE_MAX — TANPA memotong koin apa pun. Penambang
+     yang sedang jeda (masa perawatan habis/belum pernah dibayar)
+     mendapat kapak rusak (0) dan mulai lagi setelah diperbaiki.
+     Field perawatan lama dibuang. */
+  if (typeof m.axe !== "number" || isNaN(m.axe)) {
+    var paidMs = 0;
+    if (m.upkeepUntil) paidMs = Math.max(0, m.upkeepUntil - t);
+    else if (typeof m.upkeepRemainingMs === "number" && m.upkeepRemainingMs > 0) paidMs = m.upkeepRemainingMs;
+    else if (m.upkeepNextAt) paidMs = Math.max(0, m.upkeepNextAt - t);
+    m.axe = Math.min(AXE_MAX, Math.ceil(paidMs / (MINER_CYCLE*1000)));
   }
-  if (typeof m.upkeepUntil !== "number" || isNaN(m.upkeepUntil)) m.upkeepUntil = null;
-  if (typeof m.upkeepRemainingMs !== "number" || isNaN(m.upkeepRemainingMs)) m.upkeepRemainingMs = 0;
-  if (typeof m.pausedUpkeep !== "boolean") m.pausedUpkeep = false;
-  /* Tumpukan penuh: produksi berhenti dan sisa masa perawatan
-     berbayar dibekukan (tidak hangus selagi berhenti karena penuh). */
+  delete m.upkeepUntil; delete m.upkeepRemainingMs; delete m.upkeepNextAt; delete m.pausedUpkeep;
+  m.axe = Math.max(0, Math.min(AXE_MAX, Math.floor(m.axe)));
+  /* Tumpukan penuh: produksi berhenti; daya tahan kapak tidak
+     berkurang selagi berhenti. */
   if (m.ready >= STACK_MAX) {
-    if (m.upkeepUntil) { m.upkeepRemainingMs = Math.max(0, m.upkeepUntil - t); m.upkeepUntil = null; }
-    m.pausedUpkeep = !(m.upkeepRemainingMs > 0);
     m.nextAt = null; m.remainingMs = MINER_CYCLE*1000;
     return;
   }
-  /* Pulihkan jam perawatan yang dibekukan (mis. setelah tumpukan
-     yang penuh tadi diambil): sisa masa berbayar berjalan lagi. */
-  if (!m.upkeepUntil && m.upkeepRemainingMs > 0) {
-    m.upkeepUntil = t + m.upkeepRemainingMs;
-    m.upkeepRemainingMs = 0;
-  }
-  /* Belum pernah membayar / masa berbayar tidak ada: jeda — produksi
-     dibekukan, TIDAK ada koin yang dipotong, menunggu tombol ditekan. */
-  if (!m.upkeepUntil) {
-    m.pausedUpkeep = true;
+  /* Kapak rusak: berhenti — produksi dibekukan, TIDAK ada koin yang
+     dipotong, menunggu tombol Perbaiki Kapak ditekan. */
+  if (m.axe <= 0) {
     m.nextAt = null;
     return;
   }
   if (!m.nextAt) m.nextAt = t + (m.remainingMs != null ? m.remainingMs : MINER_CYCLE*1000);
-  /* Proses Batu yang selesai sampai waktu sekarang, tetapi tidak
-     melewati batas masa perawatan berbayar: Batu hanya berproduksi
-     selagi masa berbayar masih berlaku. */
-  var limit = Math.min(t, m.upkeepUntil);
+  /* Proses Batu yang selesai sampai waktu sekarang; tiap Batu
+     mengurangi daya tahan kapak 1. Berhenti saat tumpukan penuh
+     atau kapak habis daya tahannya (rusak). */
   var guard = 0;
-  while (m.nextAt && m.nextAt <= limit && guard++ < 10000) {
-    var eventAt = m.nextAt;
+  while (m.nextAt && m.nextAt <= t && guard++ < 10000) {
     m.ready++;
-    if (m.ready >= STACK_MAX) {
-      /* Penuh tepat di tengah masa berbayar: bekukan sisanya. */
-      m.upkeepRemainingMs = Math.max(0, m.upkeepUntil - eventAt);
-      m.upkeepUntil = null;
-      m.pausedUpkeep = !(m.upkeepRemainingMs > 0);
+    m.axe--;
+    if (m.ready >= STACK_MAX || m.axe <= 0) {
       m.nextAt = null; m.remainingMs = MINER_CYCLE*1000;
       return;
     }
     m.nextAt += MINER_CYCLE*1000;
   }
-  /* Masa perawatan berbayar habis: jeda — bekukan sisa waktu siklus
-     Batu di tempat; bekerja lagi hanya setelah dibayar manual. */
-  if (m.upkeepUntil <= t) {
-    m.remainingMs = m.nextAt ? Math.max(0, m.nextAt - m.upkeepUntil) : MINER_CYCLE*1000;
-    m.nextAt = null; m.upkeepUntil = null; m.upkeepRemainingMs = 0;
-    m.pausedUpkeep = true;
-    return;
-  }
-  m.pausedUpkeep = false;
 }
 function collectMiner(m, silent){
   /* Ambil SELURUH tumpukan Batu penambang ini (0..STACK_MAX) ke gudang
-     sekaligus. Setelah kosong, penambang bekerja lagi bila masa
-     perawatan berbayarnya masih ada (termasuk sisa yang dibekukan
-     saat penuh) — bila masa berbayarnya habis, ia tetap jeda sampai
-     pemain menekan tombol Bayar Perawatan. */
+     sekaligus. Setelah kosong, penambang bekerja lagi bila kapaknya
+     masih punya daya tahan — bila kapaknya rusak, ia tetap berhenti
+     sampai pemain menekan tombol Perbaiki Kapak. */
   settleMiner(m);
   var n = (typeof m.ready === "number") ? m.ready : (m.ready ? 1 : 0);
   if (n <= 0) return 0;
   m.ready = 0;
   S.inv["bijih"] = (S.inv["bijih"]||0) + n;
   var t = nowMs();
-  if (m.upkeepUntil && m.upkeepUntil > t) {
-    m.pausedUpkeep = false;
-    if (!m.nextAt) m.nextAt = t + (m.remainingMs != null ? m.remainingMs : MINER_CYCLE*1000);
-  } else if (!m.upkeepUntil && typeof m.upkeepRemainingMs === "number" && m.upkeepRemainingMs > 0) {
-    m.upkeepUntil = t + m.upkeepRemainingMs;
-    m.upkeepRemainingMs = 0;
-    m.pausedUpkeep = false;
+  if (m.axe > 0) {
     if (!m.nextAt) m.nextAt = t + (m.remainingMs != null ? m.remainingMs : MINER_CYCLE*1000);
   } else {
-    m.pausedUpkeep = true;
     m.nextAt = null;
   }
   if (!silent) { toast("⛏️ " + n + " " + tr("Batu diambil", "Batu collected")); haptic("success"); }
   return n;
 }
-/* Bayar perawatan penambang SECARA MANUAL — satu-satunya jalan koin
-   perawatan keluar dari saldo pemain, dan hanya dari handler tombol
-   Bayar Perawatan. Tombol hanya aktif saat masa perawatan penambang
-   itu sudah habis (sedang jeda); fungsi ini juga menjaga hal yang
-   sama: bila masa berbayar masih tersisa, TIDAK ada koin yang
-   dipotong. Bila koin tidak cukup, tampilkan pesan persis
-   "Koin tidak cukup untuk membayar perawatan" dan tidak jadi bayar. */
-function payMinerUpkeep(m){
+/* Perbaiki Kapak Batu penambang SECARA MANUAL — satu-satunya jalan
+   koin perbaikan keluar dari saldo pemain, dan hanya dari handler
+   tombol Perbaiki Kapak. Perbaikan mengembalikan daya tahan ke
+   PENUH (AXE_MAX) dengan biaya AXE_REPAIR_PER per daya tahan yang
+   hilang; bisa dilakukan kapan saja selama kapak belum penuh,
+   tidak harus menunggu rusak. Bila kapak sudah penuh, TIDAK ada
+   koin yang dipotong. Bila koin tidak cukup, tampilkan pesan
+   "Koin tidak cukup untuk memperbaiki kapak" dan tidak jadi
+   memperbaiki. */
+function repairMinerAxe(m){
   settleMiner(m);
-  if (minerPaidMs(m, nowMs()) > 0) return false; /* masih dalam masa berbayar — tombol seharusnya nonaktif */
-  if (S.coins < MINER_UPKEEP) {
-    toast(tr("Koin tidak cukup untuk membayar perawatan", "Not enough coins to pay for maintenance"));
+  if (m.axe >= AXE_MAX) return false; /* kapak sudah penuh — tombol seharusnya nonaktif */
+  var cost = axeRepairCost(m);
+  if (S.coins < cost) {
+    toast(tr("Koin tidak cukup untuk memperbaiki kapak", "Not enough coins to repair the axe"));
     haptic("error");
     return false;
   }
-  S.coins -= MINER_UPKEEP;
+  S.coins -= cost;
+  m.axe = AXE_MAX;
   var t = nowMs();
-  m.upkeepUntil = t + MINER_UPKEEP_MS;
-  m.upkeepRemainingMs = 0;
-  m.pausedUpkeep = false;
   if (m.ready < STACK_MAX && !m.nextAt) m.nextAt = t + (m.remainingMs != null ? m.remainingMs : MINER_CYCLE*1000);
-  toast(tr("🔧 Perawatan Penambang #", "🔧 Miner #") + m.num + tr(" dibayar — bekerja 1 jam ke depan", " maintenance paid — working for the next 1 hour"));
+  toast(tr("🪓 Kapak Penambang #", "🪓 Miner #") + m.num + tr(" diperbaiki — daya tahan penuh lagi", "'s axe repaired — durability full again"));
   haptic("success");
   return true;
 }
 
 /* ================= RENDER: TAMBANG =================
-   Tab ⛏️ Tambang — terbuka di Balai Kota Lv 4; sebelum itu hanya
-   tampil pesan terkunci. Sesudah terbuka: kartu Tambang berisi jumlah
+   Tab ⛏️ Tambang — terbuka di Balai Kota Lv 4 dan sebelum
+   itu hanya tampil pesan terkunci. Sesudah terbuka: kartu Tambang berisi jumlah
    penambang, tombol Ambil Semua & Beli Penambang, dan satu kartu per
-   penambang (tumpukan ⛏️ X/5, hitung mundur Batu berikutnya, sisa
-   masa perawatan berbayar / status jeda, tombol Bayar Perawatan —
-   hanya aktif saat masa perawatan habis; saat masih ada sisa masa,
-   tombol nonaktif & menampilkan sisa waktunya — serta tombol
+   penambang (tumpukan ⛏️ X/5, hitung mundur Batu berikutnya, daya
+   tahan Kapak Batu 🪓 X/20 dengan bar, tombol Perbaiki Kapak —
+   aktif selama daya tahan belum penuh, menampilkan biaya perbaikan
+   ke penuh; saat kapak penuh tombol nonaktif — serta tombol
    Ambil & Jual Penambang). */
 function renderTambang(){
   var wrap = $("tambang-content"); if (!wrap) return;
-  if (S.th < 4) {
+  if (!MINE_TRIAL_OPEN && S.th < 4) {
     wrap.innerHTML = '<div class="card"><h2>⛏️ ' + tr("Tambang", "Mine") + '</h2>' +
       '<div class="lock-note">' + tr("🔒 Tambang terbuka di Balai Kota Lv 4", "🔒 The Mine unlocks at Town Hall Lv 4") + '</div></div>';
     return;
@@ -1405,7 +1371,6 @@ function renderTambang(){
   var totalReady = S.miners.reduce(function(s2, m){ return s2 + (m.ready||0); }, 0);
   var html = '<div class="card"><div class="row-between"><h2>⛏️ ' + tr("Tambang", "Mine") + '</h2>' +
     '<span class="pill">👷 ' + S.miners.length + ' / ' + MINER_MAX + '</span></div>';
-  html += '<p class="small muted">' + tr("Setiap penambang menghasilkan 1 Batu tiap 30 menit, menumpuk sampai 5 Batu lalu berhenti sampai diambil. Penambang tidak butuh makan, tapi perlu perawatan: tekan tombol 🔧 Bayar Perawatan · 10 🪙 di kartu penambang untuk membuatnya bekerja selama 1 jam. Koin TIDAK dipotong otomatis — penambang hanya bekerja setelah kamu membayar, dan jeda bila masa perawatannya habis sampai kamu membayar lagi. Batu dijual di Pasar seharga 25 🪙.", "Each miner produces 1 Batu every 30 minutes, stacking up to 5 Batu, then stops until collected. Miners don't need food, but they need maintenance: tap the 🔧 Pay Maintenance · 10 🪙 button on a miner's card to make it work for 1 hour. Coins are NEVER deducted automatically — a miner only works after you pay, and pauses when its paid maintenance runs out until you pay again. Batu sells at the Market for 25 🪙.") + '</p>';
   html += '<div class="row" style="margin-bottom:10px"><button class="btn-green grow" data-mact="collectall"' + (totalReady ? "" : " disabled") + '>🧺 ' + tr("Ambil Semua", "Collect All") + (totalReady ? ' · ' + totalReady + ' ⛏️' : '') + '</button>' +
     '<button class="btn-amber grow" data-mact="buy"' + (S.miners.length >= MINER_MAX ? " disabled" : "") + '>👷 ' + tr("Beli Penambang · ", "Buy Miner · ") + fmt(MINER_BUY) + ' 🪙</button></div>';
   html += '<div id="miner-cards"></div></div>';
@@ -1418,23 +1383,26 @@ function renderTambang(){
     var d = document.createElement("div");
     d.className = "animal-card";
     var full = m.ready >= STACK_MAX;
-    var paidMs = minerPaidMs(m, nowMs());
-    var paused = paidMs <= 0;
-    var status = paused ? tr("⏸️ Jeda — bayar perawatan untuk bekerja lagi", "⏸️ Paused — pay maintenance to work again")
+    var axe = (typeof m.axe === "number") ? m.axe : AXE_MAX;
+    var broken = axe <= 0;
+    var status = broken ? tr("🪓 Kapak rusak — perbaiki untuk menambang lagi", "🪓 Axe broken — repair it to mine again")
       : full ? tr("⛏️ Penuh " + m.ready + "/" + STACK_MAX + " — ambil dulu agar menambang lagi", "⛏️ Full " + m.ready + "/" + STACK_MAX + " — collect to resume mining")
       : (m.ready > 0 ? tr("⛏️ " + m.ready + "/" + STACK_MAX + " Siap diambil!", "⛏️ " + m.ready + "/" + STACK_MAX + " Ready to collect!") : tr("Sedang menambang", "Mining"));
-    var nextTxt = paused ? tr("Jeda", "Paused") : full ? tr("Penuh!", "Full!") : (m.nextAt ? mmss(m.nextAt - nowMs()) : "—");
-    /* Tombol Bayar Perawatan: HANYA aktif saat masa perawatan habis
-       (penambang jeda). Selama sisa masa berbayar masih ada, tombol
-       nonaktif dan labelnya menampilkan sisa waktu itu — menekan
-       (atau handler-nya) tidak memotong koin apa pun. */
-    var payBtn = paused
-      ? '<button class="btn-amber btn-small grow" data-mact="payupkeep" data-uid="' + m.uid + '">🔧 ' + tr("Bayar Perawatan · ", "Pay Maintenance · ") + fmt(MINER_UPKEEP) + tr(" koin", " coins") + '</button>'
-      : '<button class="btn-amber btn-small grow" data-mact="payupkeep" data-uid="' + m.uid + '" disabled>🔧 ' + tr("Perawatan: ", "Maintenance: ") + fmtPaidLeft(paidMs) + '</button>';
+    var nextTxt = broken ? tr("Kapak rusak", "Axe broken") : full ? tr("Penuh!", "Full!") : (m.nextAt ? mmss(m.nextAt - nowMs()) : "—");
+    /* Tombol Perbaiki Kapak: aktif selama daya tahan belum penuh —
+       labelnya menampilkan biaya perbaikan sampai penuh. Saat kapak
+       penuh, tombol nonaktif — menekan (atau handler-nya) tidak
+       memotong koin apa pun. */
+    var repairCost = axeRepairCost(m);
+    var repairBtn = axe < AXE_MAX
+      ? '<button class="btn-amber btn-small grow" data-mact="repair" data-uid="' + m.uid + '">🔨 ' + tr("Perbaiki Kapak · ", "Repair Axe · ") + fmt(repairCost) + tr(" koin", " coins") + '</button>'
+      : '<button class="btn-amber btn-small grow" data-mact="repair" data-uid="' + m.uid + '" disabled>🪓 ' + tr("Kapak Batu: penuh", "Stone Axe: full") + '</button>';
     d.innerHTML = '<div class="row-between"><b>👷 ' + tr("Penambang", "Miner") + ' #' + m.num + '</b><span class="small">' + status + '</span></div>' +
       '<div class="row small" style="margin:5px 0"><span>⛏️ <b>' + (m.ready||0) + '/' + STACK_MAX + '</b></span><span>⏱️ ' + tr("Batu berikutnya: ", "Next Batu: ") + '<span class="cd">' + nextTxt + '</span></span></div>' +
-      '<div class="row small" style="margin:0 0 5px"><span>🔧 ' + tr("Perawatan: ", "Maintenance: ") + (paused ? tr("habis", "expired") : fmtPaidLeft(paidMs)) + '</span>' + (paused ? '<span style="color:var(--danger);font-weight:700">⏸️ ' + tr("Jeda — bayar perawatan untuk bekerja lagi", "Paused — pay maintenance to work again") + '</span>' : '') + '</div>' +
-      '<div class="row" style="margin:0 0 5px">' + payBtn + '</div>' +
+      '<div class="row small" style="margin:0 0 3px"><span>🪓 ' + tr("Kapak Batu: ", "Stone Axe: ") + '<b>' + axe + '/' + AXE_MAX + '</b></span>' + (broken ? '<span style="color:var(--danger);font-weight:700">🪓 ' + tr("Rusak — perbaiki untuk menambang lagi", "Broken — repair to mine again") + '</span>' : '') + '</div>' +
+      '<div class="xpbar" style="margin:0 0 4px"><i style="width:' + (axe/AXE_MAX*100) + '%;' + (broken ? 'background:var(--danger)' : (axe <= 5 ? 'background:var(--amber,#e8a33d)' : '')) + '"></i></div>' +
+      '<div class="row small muted" style="margin:0 0 7px"><span>🔨 ' + tr("Biaya perbaikan kapak: ", "Axe repair cost: ") + '<b>' + fmt(AXE_REPAIR_PER) + tr(" koin", " coins") + '</b> ' + tr("per daya tahan hilang", "per missing durability") + '</span></div>' +
+      '<div class="row" style="margin:0 0 5px">' + repairBtn + '</div>' +
       '<div class="row"><button class="btn-green btn-small" data-mact="collect" data-uid="' + m.uid + '"' + (m.ready > 0 ? "" : " disabled") + '>' + tr("Ambil ", "Collect ") + '⛏️ ' + (m.ready||0) + '/' + STACK_MAX + '</button>' +
       '<button class="btn-danger btn-small" data-mact="sell" data-uid="' + m.uid + '">' + tr("Jual Penambang ", "Sell Miner ") + '#' + m.num + ' · +' + fmt(MINER_SELLBACK) + ' 🪙</button></div>';
     cwrap.appendChild(d);
@@ -1447,16 +1415,15 @@ function renderTambang(){
         if (S.miners.length >= MINER_MAX) return;
         if (!spendCoins(MINER_BUY)) { renderStatus(); return; }
         S.minerSeq = (S.minerSeq || 0) + 1;
-        /* Penambang baru mulai dalam keadaan JEDA: belum ada masa
-           perawatan berbayar — ia mulai bekerja hanya setelah pemain
-           menekan tombol Bayar Perawatan di kartunya. */
-        S.miners.push({ uid: "m" + Date.now() + "_" + S.minerSeq, num: S.minerSeq, nextAt: null, remainingMs: MINER_CYCLE*1000, ready: 0, upkeepUntil: null, upkeepRemainingMs: 0, pausedUpkeep: true });
-        toast(tr("👷 Penambang ", "👷 Miner ") + "#" + S.minerSeq + tr(" dibeli — bayar perawatan untuk mulai menambang", " bought — pay maintenance to start mining")); haptic("success"); save(); renderAll();
-      } else if (act === "payupkeep" && m) {
-        /* Penjaga kedua selain atribut disabled: bila masa perawatan
-           masih tersisa, jangan potong koin apa pun. */
-        if (minerPaidMs(m, nowMs()) > 0) return;
-        payMinerUpkeep(m); save(); renderAll();
+        /* Penambang baru SUDAH termasuk Kapak Batu berdaya tahan
+           penuh — ia langsung mulai menambang begitu dibeli. */
+        S.miners.push({ uid: "m" + Date.now() + "_" + S.minerSeq, num: S.minerSeq, nextAt: nowMs() + MINER_CYCLE*1000, remainingMs: MINER_CYCLE*1000, ready: 0, axe: AXE_MAX });
+        toast(tr("👷 Penambang ", "👷 Miner ") + "#" + S.minerSeq + tr(" dibeli — Kapak Batu penuh, langsung menambang", " bought — Stone Axe full, mining right away")); haptic("success"); save(); renderAll();
+      } else if (act === "repair" && m) {
+        /* Penjaga kedua selain atribut disabled: bila kapak sudah
+           penuh, jangan potong koin apa pun. */
+        if (typeof m.axe === "number" && m.axe >= AXE_MAX) return;
+        repairMinerAxe(m); save(); renderAll();
       } else if (act === "collectall") {
         var n = 0;
         S.miners.forEach(function(x){ if (x.ready > 0) n += collectMiner(x, true); });
