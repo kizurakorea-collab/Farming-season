@@ -172,12 +172,12 @@
 
       /* seeds & plots */
       .seed-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
-      .seed{border:2px solid var(--line);border-radius:14px;background:var(--card2);padding:9px 6px;
+      .seed{border:2px solid var(--line);border-radius:14px;background:var(--card2);padding:6px 6px;
         text-align:center;min-height:44px}
       .seed.sel{border-color:var(--green);background:var(--green-soft)}
-      .seed .em{font-size:26px;display:block}
-      .seed b{font-size:13px;display:block}
-      .seed span{font-size:11px;color:var(--muted);display:block}
+      .seed .em{font-size:23px;display:block;line-height:1.2}
+      .seed b{font-size:13px;display:block;line-height:1.25}
+      .seed span{font-size:11px;color:var(--muted);display:block;line-height:1.3}
       .plot-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:9px}
       @media(min-width:560px){.plot-grid{grid-template-columns:repeat(4,1fr)}}
       .plot{border-radius:14px;min-height:104px;padding:8px 6px;text-align:center;position:relative;
@@ -235,6 +235,13 @@
       .cd{font-variant-numeric:tabular-nums;font-weight:700}
 
       /* lists */
+      /* toko benih: baris per jenis benih di bawah kartu Pilih Benih */
+      .shop-row{display:flex;align-items:center;gap:9px;padding:9px 0;border-bottom:1px dashed var(--line)}
+      .shop-row:last-child{border-bottom:none}
+      .shop-row .em{font-size:26px}
+      .shop-row .grow{display:flex;flex-direction:column;gap:1px;min-width:0}
+      .shop-row.locked{opacity:.55}
+      .shop-btns{display:flex;gap:6px;flex-shrink:0}
       .inv-row{display:flex;align-items:center;gap:9px;padding:9px 0;border-bottom:1px dashed var(--line)}
       .inv-row:last-child{border-bottom:none}
       .inv-row .em{font-size:26px}
@@ -340,9 +347,14 @@
         </div>
         <div class="card">
           <h2 id="seed-title">🌱 Pilih Benih</h2>
-          <p class="small muted" id="seed-help">Ketuk benih, lalu ketuk petak kosong untuk menanam. Ketuk tanaman yang siap untuk memanen.</p>
+          <p class="small muted" id="seed-help">Ketuk benih, lalu ketuk petak kosong untuk menanam — menanam memakai 1 benih dari stokmu. Ketuk tanaman yang siap untuk memanen.</p>
           <div class="seed-grid" id="seed-grid"></div>
           <p class="small muted" id="seed-lock-note" style="margin:10px 0 0"></p>
+        </div>
+        <div class="card">
+          <h2 id="seedshop-title">🏪 Toko Benih</h2>
+          <p class="small muted" id="seedshop-desc">Beli benih di sini untuk mengisi stokmu — menanam memakai benih dari stok, bukan koin langsung. Stok toko terbatas 20 per jenis per hari dan diperbarui setiap tengah malam.</p>
+          <div id="seed-shop"></div>
         </div>
       </section>
 
@@ -847,6 +859,9 @@ function freshState() {
     th: 1, plotsOwned: 3,
     plots: [], /* {crop, plantedAt, readyAt} atau null */
     selectedSeed: "wortel",
+    seedDay: "", /* tanggal stok benih harian (reset tiap hari) */
+    seedBought: {}, /* cropId -> jumlah benih dibeli hari ini di Toko Benih (maks SEED_DAILY_LIMIT) */
+    seedStock: {}, /* cropId -> jumlah benih yang dimiliki pemain (dibeli di Toko Benih, dipakai saat menanam) */
     inv: {}, /* itemId -> jumlah (tanaman + telur/susu/wol) */
     animals: [], /* {uid,type,num,fedUntil,nextAt,remainingMs,ready} */
     miners: [], /* {uid,num,nextAt,remainingMs,ready,upkeepUntil,upkeepRemainingMs,pausedUpkeep} — penambang tambang (TH Lv 4); upkeepUntil = batas masa perawatan berbayar (manual), upkeepRemainingMs = sisa masa berbayar yang dibekukan saat tumpukan penuh, pausedUpkeep = jeda karena masa perawatan habis/belum dibayar */
@@ -922,6 +937,49 @@ function toast(msg){
   setTimeout(function(){ t.remove(); }, 2800);
 }
 function spendCoins(n){ if (S.coins < n) { toast(tr("🪙 Koin tidak cukup", "🪙 Not enough coins")); haptic("error"); return false; } S.coins -= n; return true; }
+/* Stok benih harian di Toko Benih: maks 20 benih per jenis per hari yang
+   bisa dibeli, reset tiap tengah malam. Benih yang dibeli masuk ke stok
+   benih pemain (seedStock); menanam memakai 1 benih dari stok itu. */
+var SEED_DAILY_LIMIT = 20;
+function seedBoughtToday(id){
+  var t = todayStr();
+  if (S.seedDay !== t) { S.seedDay = t; S.seedBought = {}; }
+  return (S.seedBought && S.seedBought[id]) || 0;
+}
+function seedLeftToday(id){ return Math.max(0, SEED_DAILY_LIMIT - seedBoughtToday(id)); }
+function seedStockOf(id){ return (S.seedStock && S.seedStock[id]) || 0; }
+function buySeed(id, qty){
+  var c = cropById(id); if (!c) return;
+  if (S.th < (c.thReq || 1)) { toast(tr("🔒 " + cName(c) + " terkunci — terbuka di Balai Kota Lv " + c.thReq, "🔒 " + cName(c) + " is locked — unlocks at Town Hall Lv " + c.thReq)); haptic("error"); return; }
+  var left = seedLeftToday(id);
+  if (left <= 0) { toast(tr("🌱 Stok benih " + cName(c) + " hari ini habis (maks " + SEED_DAILY_LIMIT + "/hari) — kembali besok", "🌱 Today's " + cName(c) + " seed stock is sold out (max " + SEED_DAILY_LIMIT + "/day) — come back tomorrow")); haptic("error"); return; }
+  qty = Math.min(qty, left);
+  if (!spendCoins(c.seed * qty)) { renderStatus(); return; }
+  if (!S.seedStock) S.seedStock = {};
+  S.seedStock[id] = seedStockOf(id) + qty;
+  S.seedBought[id] = seedBoughtToday(id) + qty; /* pembelian mengurangi stok harian toko */
+  toast(tr("🌱 Beli ", "🌱 Bought ") + qty + " " + tr("benih ", "") + cName(c) + (LANG === "en" ? " seeds" : "") + tr(" — stok kamu: ", " — your stock: ") + S.seedStock[id]);
+  haptic(); save(); renderAll();
+}
+/* Reset Stok Harian dengan Gram: bayar 0,01 Gram lewat TON Connect
+   (payWithTon, ke dompet pemilik — sama seperti Premium Pass & Toko
+   Premium), lalu hitungan pembelian hari ini dikosongkan sehingga
+   stok semua benih kembali penuh SEED_DAILY_LIMIT untuk hari ini.
+   Baris reset hanya tampil di Toko Benih bila ada benih terbuka yang
+   stok hariannya sudah habis. */
+var SEED_RESET_PRICE_GRAM = 0.01;
+function anySeedStockOut(){
+  return CROPS.some(function(c){ return S.th >= (c.thReq || 1) && seedLeftToday(c.id) <= 0; });
+}
+function resetSeedStockWithGram(){
+  payWithTon(SEED_RESET_PRICE_GRAM, function(){
+    S.seedDay = todayStr();
+    S.seedBought = {};
+    toast(tr("🔄 Stok benih direset — semua benih kembali penuh " + SEED_DAILY_LIMIT + " untuk hari ini", "🔄 Seed stock reset — all seeds are back to " + SEED_DAILY_LIMIT + " for today"));
+    haptic("success");
+    save(); renderAll();
+  });
+}
 
 /* ================= PREMIUM PASS (GRAM ASLI VIA TON CONNECT) ================= */
 var PREMIUM_PRICE_GRAM = 0.5, PREMIUM_DAYS = 30, PREMIUM_DAILY_COINS = 1000;
@@ -1513,10 +1571,47 @@ function renderSeeds(){
       b.disabled = true;
       b.innerHTML = '<span class="em">🔒</span><b>' + cName(c) + '</b><span>' + tr("Terkunci", "Locked") + '</span><span>' + tr("Terbuka di Balai Kota Lv ", "Unlocks at Town Hall Lv ") + c.thReq + '</span>';
     } else {
-      b.innerHTML = '<span class="em">' + c.em + '</span><b>' + cName(c) + '</b><span>' + tr("Benih ", "Seed ") + c.seed + ' 🪙 · ' + tr("Jual ", "Sell ") + c.sell + ' 🪙</span><span>⏱️ ' + fmtGrowMin(c.grow) + ' ' + tr("menit", "min") + (premiumActive() ? ' ⚡' : '') + '</span>';
+      b.innerHTML = '<span class="em">' + c.em + '</span><b>' + cName(c) + '</b><span>' + tr("Benih ", "Seed ") + c.seed + ' 🪙 · ' + tr("Jual ", "Sell ") + c.sell + ' 🪙</span><span>⏱️ ' + fmtGrowMin(c.grow) + ' ' + tr("menit", "min") + (premiumActive() ? ' ⚡' : '') + '</span><span>🎒 ' + seedStockOf(c.id) + '</span>';
       b.onclick = function(){ S.selectedSeed = c.id; haptic(); save(); renderSeeds(); };
     }
     g.appendChild(b);
+  });
+}
+/* Toko Benih — kartu di bawah Pilih Benih: beli benih ke stok pemain,
+   stok toko maks SEED_DAILY_LIMIT per jenis per hari (reset tengah malam). */
+function renderSeedShop(){
+  var el = $("seed-shop"); if (!el) return;
+  var html = "";
+  CROPS.forEach(function(c){
+    var locked = S.th < (c.thReq || 1);
+    if (locked) {
+      html += '<div class="shop-row locked"><span class="em">🔒</span><div class="grow"><b>' + cName(c) + '</b>' +
+        '<span class="small muted">' + tr("Terbuka di Balai Kota Lv ", "Unlocks at Town Hall Lv ") + c.thReq + '</span></div></div>';
+      return;
+    }
+    var left = seedLeftToday(c.id), own = seedStockOf(c.id);
+    html += '<div class="shop-row"><span class="em">' + c.em + '</span><div class="grow"><b>' + cName(c) + '</b>' +
+      '<span class="small muted">' + tr("Benih ", "Seed ") + c.seed + ' 🪙 · 🎒 ' + tr("Stok kamu: ", "Your stock: ") + '<b>' + own + '</b></span></div>' +
+      '<div class="shop-btns">' +
+      '<button class="btn-green btn-small" data-seedbuy="1" data-id="' + c.id + '"' + (left <= 0 ? " disabled" : "") + '>' + tr("Beli 1", "Buy 1") + '</button>' +
+      '<button class="btn-green btn-small" data-seedbuy="5" data-id="' + c.id + '"' + (left < 5 ? " disabled" : "") + '>' + tr("Beli 5", "Buy 5") + '</button>' +
+      '</div></div>';
+  });
+  /* Baris Reset Stok Harian — hanya tampil bila ada benih terbuka yang
+     stok hariannya sudah habis; bayar 0,01 Gram lewat TON Connect. */
+  if (anySeedStockOut()) {
+    html += '<div class="shop-row"><span class="em">🔄</span><div class="grow"><b>' + tr("Reset Stok Harian", "Reset Daily Stock") + '</b>' +
+      '<span class="small muted">' + tr("Stok semua benih kembali penuh ", "All seed stock refills to ") + SEED_DAILY_LIMIT + tr(" untuk hari ini · ", " for today · ") + '<span class="gram-price">' + fmtGram(SEED_RESET_PRICE_GRAM) + ' Gram</span></span></div>' +
+      '<div class="shop-btns">' +
+      '<button class="btn-amber btn-small" data-seedreset="1">' + tr("Reset dengan Gram", "Reset with Gram") + '</button>' +
+      '</div></div>';
+  }
+  el.innerHTML = html;
+  el.querySelectorAll("button[data-seedbuy]").forEach(function(b){
+    b.onclick = function(){ buySeed(b.dataset.id, parseInt(b.dataset.seedbuy, 10) || 1); };
+  });
+  el.querySelectorAll("button[data-seedreset]").forEach(function(b){
+    b.onclick = function(){ resetSeedStockWithGram(); };
   });
 }
 function renderPlots(){
@@ -1593,10 +1688,11 @@ function plotTap(i){
   if (!p) {
     var c = cropById(S.selectedSeed);
     if (S.th < (c.thReq || 1)) { toast(tr("🔒 " + cName(c) + " terkunci — terbuka di Balai Kota Lv " + c.thReq, "🔒 " + cName(c) + " is locked — unlocks at Town Hall Lv " + c.thReq)); haptic("error"); return; }
-    if (!spendCoins(c.seed)) { renderStatus(); return; }
+    if (seedStockOf(c.id) <= 0) { toast(tr("🌱 Benih " + cName(c) + " di stokmu habis — beli dulu di Toko Benih di bawah 👇", "🌱 You're out of " + cName(c) + " seeds — buy some at the Seed Shop below 👇")); haptic("error"); return; }
     /* readyAt selalu menyimpan waktu tumbuh normal; percepatan
        Premium diterapkan dinamis lewat effReadyAt(). */
     S.plots[i] = { crop: c.id, plantedAt: t, readyAt: t + c.grow*1000 };
+    S.seedStock[c.id] = seedStockOf(c.id) - 1; /* menanam memakai 1 benih dari stok pemain */
     track("plant", 1); addXp(1);
     toast(c.em + " " + cName(c) + " " + tr("ditanam", "planted")); haptic();
   } else if (t >= effReadyAt(p)) {
@@ -2174,7 +2270,7 @@ function renderAll(){
   ensurePlots();
   S.animals.forEach(settleAnimal);
   if (Array.isArray(S.miners)) S.miners.forEach(settleMiner);
-  renderStatus(); renderTH(); renderBalaiKota(); renderSeeds(); renderPlots(); renderPens(); renderTambang();
+  renderStatus(); renderTH(); renderBalaiKota(); renderSeeds(); renderSeedShop(); renderPlots(); renderPens(); renderTambang();
   renderMarket(); renderDailyClaim(); renderMissions(); renderGram(); renderFriends();
 }
 /* render ringan tiap detik: hanya hitung mundur & status */
@@ -2403,7 +2499,9 @@ function applyStaticTexts(){
   set("bk-unlock-title", tr("🔓 Terbuka di Tiap Level Balai Kota", "🔓 Unlocked at Each Town Hall Level"));
   set("garden-title", tr("🌾 Kebun Saya", "🌾 My Garden"));
   set("seed-title", tr("🌱 Pilih Benih", "🌱 Choose Seeds"));
-  set("seed-help", tr("Ketuk benih, lalu ketuk petak kosong untuk menanam. Ketuk tanaman yang siap untuk memanen.", "Tap a seed, then tap an empty plot to plant it. Tap a ready crop to harvest it."));
+  set("seed-help", tr("Ketuk benih, lalu ketuk petak kosong untuk menanam — menanam memakai 1 benih dari stokmu. Ketuk tanaman yang siap untuk memanen.", "Tap a seed, then tap an empty plot to plant it — planting uses 1 seed from your stock. Tap a ready crop to harvest it."));
+  set("seedshop-title", tr("🏪 Toko Benih", "🏪 Seed Shop"));
+  set("seedshop-desc", tr("Beli benih di sini untuk mengisi stokmu — menanam memakai benih dari stok, bukan koin langsung. Stok toko terbatas 20 per jenis per hari dan diperbarui setiap tengah malam.", "Buy seeds here to fill your stock — planting uses seeds from your stock, not coins directly. Shop stock is limited to 20 per type per day and refreshes every midnight."));
   set("market-title", tr("🏪 Pasar — Gudang Hasil", "🏪 Market — Produce Storage"));
   set("btn-sell-all", tr("Jual Semua", "Sell All"));
   set("market-desc", tr("Jual hasil panen, produk ternak, dan Batu dari tambang dari gudang untuk mendapatkan koin.", "Sell harvested crops, animal products, and Batu from the mine from storage to earn coins."));
