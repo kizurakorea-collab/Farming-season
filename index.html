@@ -519,7 +519,7 @@
       <button data-tab="tambang"><span class="tic">⛏️</span><span class="tab-label">Tambang</span></button>
       <button data-tab="pasar"><span class="tic">🏪</span><span class="tab-label">Pasar</span></button>
       <button data-tab="misi"><span class="tic">📋</span><span class="tab-label">Misi</span><span class="tab-badge" id="badge-misi" style="display:none">0</span></button>
-      <button data-tab="gram"><span class="tic">💎</span><span class="tab-label">Gram</span></button>
+      <button data-tab="gram"><span class="tic">👛</span><span class="tab-label">Dompet</span></button>
       <button data-tab="teman"><span class="tic">👥</span><span class="tab-label">Teman</span><span class="tab-badge" id="badge-teman" style="display:none">0</span></button>
     </nav>
 
@@ -588,11 +588,11 @@ var FEED_RECIPES = {
   domba: { crop:"tomat",   need:3, out:2 }
 };
 /* Pakan Campuran Ayam — KHUSUS AYAM (sapi/domba tidak bisa memakainya):
-   2 Wortel + 2 Kentang → 5 Pakan Campuran Ayam.
+   3 Wortel + 3 Kentang → 5 Pakan Campuran Ayam.
    1 pakan campuran membuat 1 ayam kenyang 20 menit (4 siklus telur:
    1 telur per 5 menit). Stoknya terpisah dari stok Pakan Ayam biasa,
    dengan batas stok yang sama (FEED_STOCK_MAX = 20). */
-var MIX_FEED_RECIPE = { crop1:"wortel", need1:2, crop2:"kentang", need2:2, out:5 };
+var MIX_FEED_RECIPE = { crop1:"wortel", need1:3, crop2:"kentang", need2:3, out:5 };
 var MIX_FEED_MS = 20*60*1000; /* 1 pakan campuran = kenyang 20 menit */
 /* Koin yang dihemat sekali membuat pakan dibanding membeli pakai koin. */
 function feedSavings(type){
@@ -1111,7 +1111,7 @@ function makeFeed(type){
   haptic("success");
   save(); renderAll();
 }
-/* Buat Pakan Campuran Ayam: 2 Wortel + 2 Kentang → 5 pakan campuran.
+/* Buat Pakan Campuran Ayam: 3 Wortel + 3 Kentang → 5 pakan campuran.
    Stok campuran terpisah dari stok Pakan Ayam biasa, batas sama (20). */
 function makeMixFeed(){
   var R = MIX_FEED_RECIPE, c1 = cropById(R.crop1), c2 = cropById(R.crop2);
@@ -2449,7 +2449,7 @@ function applyStaticTexts(){
   setH("redeem-desc", tr("Masukkan kode undangan teman untuk bonus sambutan <b>+150 🪙 +25 XP</b> (sekali pakai).", "Enter a friend's invite code for a welcome bonus of <b>+150 🪙 +25 XP</b> (one-time)."));
   set("btn-redeem", tr("Tukar Kode", "Redeem Code"));
   set("footer-note", tr("Progres tersimpan otomatis di perangkat ini.", "Progress is saved automatically on this device."));
-  var tabNames = { kebun: tr("Kebun", "Garden"), ternak: tr("Ternak", "Livestock"), tambang: tr("Tambang", "Mine"), pasar: tr("Pasar", "Market"), misi: tr("Misi", "Missions"), gram: "Gram", premium: "Premium", balaikota: tr("Balai Kota", "Town Hall"), teman: tr("Teman", "Friends") };
+  var tabNames = { kebun: tr("Kebun", "Garden"), ternak: tr("Ternak", "Livestock"), tambang: tr("Tambang", "Mine"), pasar: tr("Pasar", "Market"), misi: tr("Misi", "Missions"), gram: tr("Dompet", "Wallet"), premium: "Premium", balaikota: tr("Balai Kota", "Town Hall"), teman: tr("Teman", "Friends") };
   document.querySelectorAll("button[data-tab]").forEach(function(b){
     var s = b.querySelector(".tab-label"); if (s && tabNames[b.dataset.tab]) s.textContent = tabNames[b.dataset.tab];
   });
