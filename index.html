@@ -256,6 +256,16 @@
       @media (prefers-color-scheme: dark){.gram-price{color:#c9aef7}.price-tag{color:var(--green-d)}}
       .hist-row{display:flex;justify-content:space-between;gap:8px;padding:7px 0;border-bottom:1px dashed var(--line);font-size:13px}
       .hist-row:last-child{border-bottom:none}
+      /* Tarik Gram manual: kartu permintaan + lencana status */
+      .wd-req{border:1px solid var(--line);border-radius:14px;padding:11px;margin-bottom:9px;background:var(--card2)}
+      .wd-req .wd-addr{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;word-break:break-all}
+      .wd-status{display:inline-flex;align-items:center;border-radius:999px;padding:3px 10px;
+        font-weight:800;font-size:11.5px;border:1px solid var(--line);background:var(--card);white-space:nowrap}
+      .wd-status.wait{background:var(--amber-soft);border-color:var(--amber);color:#8a5a12}
+      .wd-status.done{background:var(--green-soft);border-color:var(--green);color:var(--green-d)}
+      .wd-status.cancel{opacity:.75;color:var(--muted)}
+      @media (prefers-color-scheme: dark){.wd-status.wait{color:var(--amber)}}
+      .wd-field-label{display:block;font-size:12.5px;font-weight:700;margin:10px 0 4px}
       code.code{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:17px;font-weight:800;
         letter-spacing:1px;background:var(--amber-soft);border:1px dashed var(--amber);
         border-radius:10px;padding:8px 12px;display:inline-block}
@@ -401,13 +411,17 @@
 
         <div class="card">
           <h2 id="wd-title">🏧 Tarik Gram</h2>
-          <p class="small" id="wd-info">Minimal tarik <b>0,5 Gram</b> · Terbuka di <b>Balai Kota Level 4</b></p>
+          <p class="small" id="wd-info">Minimal tarik <b>0,5 Gram</b> · Maksimal <b>1 Gram per hari</b> · Terbuka di <b>Balai Kota Level 4</b></p>
           <div id="withdraw-lock" class="lock-note">🔒 Penarikan Gram terkunci — naikkan Balai Kota ke Level 4 dulu.</div>
           <div id="withdraw-form" style="display:none">
-            <div class="row">
-              <input type="number" id="wd-input" min="0.5" step="0.01" placeholder="Jumlah Gram, mis. 0.5" class="grow" />
-              <button class="btn-amber" id="btn-withdraw">Tarik</button>
-            </div>
+            <label class="wd-field-label" for="wd-input" id="wd-amount-label">Jumlah Gram</label>
+            <input type="number" id="wd-input" min="0.5" max="1" step="0.01" placeholder="Jumlah Gram, mis. 0.5" />
+            <label class="wd-field-label" for="wd-wallet" id="wd-wallet-label">Alamat dompet TON kamu</label>
+            <input type="text" id="wd-wallet" placeholder="Alamat dompet TON (UQ… / EQ…)" autocomplete="off" autocapitalize="off" spellcheck="false" />
+            <p class="small muted" id="wd-addr-warn" style="margin-top:5px">⚠️ Pastikan alamat dompet benar — Gram yang terkirim ke alamat yang salah tidak bisa kembali.</p>
+            <button class="btn-amber" id="btn-withdraw" style="width:100%;margin-top:12px">Ajukan Penarikan</button>
+            <p class="small muted" id="wd-quota" style="margin-top:8px"></p>
+            <p class="small muted" id="wd-cancel-note" style="margin-top:5px">Penarikan tidak bisa dibatalkan setelah 10 menit.</p>
           </div>
           <div id="wd-history"></div>
         </div>
@@ -546,6 +560,13 @@ var FEED_RECIPES = {
   sapi:  { crop:"kentang", need:3, out:2 },
   domba: { crop:"tomat",   need:3, out:2 }
 };
+/* Pakan Campuran Ayam — KHUSUS AYAM (sapi/domba tidak bisa memakainya):
+   2 Wortel + 2 Kentang → 5 Pakan Campuran Ayam.
+   1 pakan campuran membuat 1 ayam kenyang 20 menit (4 siklus telur:
+   1 telur per 5 menit). Stoknya terpisah dari stok Pakan Ayam biasa,
+   dengan batas stok yang sama (FEED_STOCK_MAX = 20). */
+var MIX_FEED_RECIPE = { crop1:"wortel", need1:2, crop2:"kentang", need2:2, out:5 };
+var MIX_FEED_MS = 20*60*1000; /* 1 pakan campuran = kenyang 20 menit */
 /* Koin yang dihemat sekali membuat pakan dibanding membeli pakai koin. */
 function feedSavings(type){
   var R = FEED_RECIPES[type], c = cropById(R.crop);
@@ -802,6 +823,7 @@ function freshState() {
     inv: {}, /* itemId -> jumlah (tanaman + telur/susu/wol) */
     animals: [], /* {uid,type,num,fedUntil,nextAt,remainingMs,ready} */
     feedStock: {ayam:0, sapi:0, domba:0},
+    mixFeedStock: 0, /* stok Pakan Campuran Ayam (khusus ayam, maks FEED_STOCK_MAX) */
     animalSeq: {ayam:0, sapi:0, domba:0},
     daily: null,
     dailyClaim: { lastDate: "", streak: 0 },
@@ -877,6 +899,18 @@ function premiumActive(){ return !!(S && S.premiumUntil && S.premiumUntil > nowM
 function premiumDaysLeft(){ if (!premiumActive()) return 0; return Math.ceil((S.premiumUntil - nowMs()) / 86400000); }
 function sellMultiplier(){ return premiumActive() ? 2 : 1; }
 function effectivePlots(){ return S.plotsOwned + (premiumActive() ? 1 : 0); }
+/* Percepatan tanaman Premium Pass: selama pass aktif, waktu tumbuh
+   dikali 0,75 (25% lebih cepat). readyAt yang tersimpan tetap waktu
+   normal; waktu panen efektif dihitung dinamis dari plantedAt, jadi
+   tanaman yang ditanam sebelum pass dibeli ikut dipercepat, dan
+   begitu pass habis waktu tumbuh otomatis kembali normal. */
+var PREMIUM_GROW_FACTOR = 0.75;
+function growFactor(){ return premiumActive() ? PREMIUM_GROW_FACTOR : 1; }
+function effReadyAt(p){ return p.plantedAt + (p.readyAt - p.plantedAt) * growFactor(); }
+function fmtGrowMin(growSec){
+  var m = Math.round(growSec * growFactor() / 60 * 100) / 100;
+  return m.toLocaleString(LANG === "en" ? "en-US" : "id-ID", { maximumFractionDigits: 2 });
+}
 function ensurePlots(){
   var eff = effectivePlots();
   while (S.plots.length < eff) S.plots.push(null);
@@ -1043,6 +1077,49 @@ function makeFeed(type){
   haptic("success");
   save(); renderAll();
 }
+/* Buat Pakan Campuran Ayam: 2 Wortel + 2 Kentang → 5 pakan campuran.
+   Stok campuran terpisah dari stok Pakan Ayam biasa, batas sama (20). */
+function makeMixFeed(){
+  var R = MIX_FEED_RECIPE, c1 = cropById(R.crop1), c2 = cropById(R.crop2);
+  var stock = S.mixFeedStock || 0;
+  if (stock >= FEED_STOCK_MAX) {
+    toast(tr("🥗 Stok Pakan Campuran Ayam sudah penuh (" + FEED_STOCK_MAX + ")", "🥗 Chicken Mixed Feed stock is already full (" + FEED_STOCK_MAX + ")"));
+    haptic("error"); return;
+  }
+  if (stock + R.out > FEED_STOCK_MAX) {
+    toast(tr("🥗 Stok Pakan Campuran Ayam hampir penuh — ruang tersisa " + (FEED_STOCK_MAX - stock) + ", sekali buat menghasilkan " + R.out + " pakan", "🥗 Chicken Mixed Feed stock is almost full — only " + (FEED_STOCK_MAX - stock) + " space left, one batch makes " + R.out + " feed"));
+    haptic("error"); return;
+  }
+  var h1 = S.inv[R.crop1]||0, h2 = S.inv[R.crop2]||0;
+  if (h1 < R.need1 || h2 < R.need2) {
+    toast(tr("Bahan kurang — butuh " + R.need1 + " " + c1.em + " " + cName(c1) + " + " + R.need2 + " " + c2.em + " " + cName(c2) + " (di gudang: " + h1 + " " + c1.em + ", " + h2 + " " + c2.em + "). Panen dulu di Kebun!", "Not enough ingredients — need " + R.need1 + " " + c1.em + " " + cName(c1) + " + " + R.need2 + " " + c2.em + " " + cName(c2) + " (in storage: " + h1 + " " + c1.em + ", " + h2 + " " + c2.em + "). Harvest more in the Garden first!"));
+    haptic("error"); return;
+  }
+  S.inv[R.crop1] = h1 - R.need1;
+  S.inv[R.crop2] = h2 - R.need2;
+  S.mixFeedStock = stock + R.out;
+  toast(tr("🌱 " + R.out + " Pakan Campuran Ayam dibuat dari " + R.need1 + " " + c1.em + " " + cName(c1) + " + " + R.need2 + " " + c2.em + " " + cName(c2) + "!", "🌱 Made " + R.out + " Chicken Mixed Feed from " + R.need1 + " " + c1.em + " " + cName(c1) + " + " + R.need2 + " " + c2.em + " " + cName(c2) + "!"));
+  haptic("success");
+  save(); renderAll();
+}
+/* Beri 1 Pakan Campuran ke 1 ayam: kenyang 20 menit (4 siklus telur).
+   Hanya untuk ayam — stok & tombolnya hanya ada di kandang ayam, dan
+   fungsi ini menolak hewan selain ayam. Batas tumpuk kenyang tetap
+   sama seperti pakan biasa (maksimal 1 jam). */
+function feedAnimalMix(a){
+  if (a.type !== "ayam") return;
+  var A = ANIMALS.ayam;
+  if ((S.mixFeedStock||0) <= 0) { toast(tr("Stok Pakan Campuran Ayam habis — buat dulu lewat tombol 🌱 Buat Pakan Campuran", "Out of Chicken Mixed Feed — make some first with the 🌱 Make Mixed Feed button")); haptic("error"); return; }
+  var t = nowMs();
+  var cur = isFed(a) ? (a.fedUntil - t) : 0;
+  if (cur + MIX_FEED_MS > FED_MAX_MS) { toast(tr("⏱️ Waktu kenyang sudah maksimal 1 jam", "⏱️ Feed time is already at the 1-hour maximum")); haptic("error"); return; }
+  S.mixFeedStock--;
+  a.fedUntil = t + cur + MIX_FEED_MS;
+  if (a.ready < STACK_MAX && !a.nextAt) { a.nextAt = t + (a.remainingMs != null ? a.remainingMs : A.cycle*1000); }
+  track("feed", 1); addXp(1);
+  toast("🥗 " + aName(A) + " #" + a.num + tr(" diberi Pakan Campuran — kenyang 20 menit", " given Mixed Feed — fed for 20 minutes")); haptic();
+  save(); renderAll();
+}
 function collectAnimal(a, silent){
   /* Ambil SELURUH tumpukan hasil hewan ini (0..STACK_MAX) ke gudang
      sekaligus. Mengembalikan jumlah hasil yang diambil (0 bila belum
@@ -1160,7 +1237,7 @@ function renderSeeds(){
       b.disabled = true;
       b.innerHTML = '<span class="em">🔒</span><b>' + cName(c) + '</b><span>' + tr("Terkunci", "Locked") + '</span><span>' + tr("Terbuka di Balai Kota Lv ", "Unlocks at Town Hall Lv ") + c.thReq + '</span>';
     } else {
-      b.innerHTML = '<span class="em">' + c.em + '</span><b>' + cName(c) + '</b><span>' + tr("Benih ", "Seed ") + c.seed + ' 🪙 · ' + tr("Jual ", "Sell ") + c.sell + ' 🪙</span><span>⏱️ ' + (c.grow/60) + ' ' + tr("menit", "min") + '</span>';
+      b.innerHTML = '<span class="em">' + c.em + '</span><b>' + cName(c) + '</b><span>' + tr("Benih ", "Seed ") + c.seed + ' 🪙 · ' + tr("Jual ", "Sell ") + c.sell + ' 🪙</span><span>⏱️ ' + fmtGrowMin(c.grow) + ' ' + tr("menit", "min") + (premiumActive() ? ' ⚡' : '') + '</span>';
       b.onclick = function(){ S.selectedSeed = c.id; haptic(); save(); renderSeeds(); };
     }
     g.appendChild(b);
@@ -1179,14 +1256,16 @@ function renderPlots(){
       b.innerHTML = '<span class="em">🟫</span><b>' + tr("Petak Kosong", "Empty Plot") + '</b><span>' + tr("Ketuk untuk menanam", "Tap to plant") + '</span>';
     } else {
       var c = cropById(p.crop);
-      var ready = t >= p.readyAt;
+      var rAt = effReadyAt(p);
+      var ready = t >= rAt;
       if (ready) readyCount++;
-      var pct = Math.min(100, Math.max(0, (t - p.plantedAt) / (p.readyAt - p.plantedAt) * 100));
+      var pct = Math.min(100, Math.max(0, (t - p.plantedAt) / (rAt - p.plantedAt) * 100));
       b.className = "plot " + (ready ? "ready" : "growing");
       b.id = "plot-" + i;
       b.innerHTML = (ready ? '<span class="rdy-badge">' + tr("🌾 Siap Panen", "🌾 Ready to Harvest") + '</span>' : '') +
         '<span class="em">' + (ready ? c.em : "🌱") + '</span><b>' + cName(c) + '</b>' +
-        '<span class="cd">' + (ready ? tr("✅ Siap panen!", "✅ Ready to harvest!") : mmss(p.readyAt - t)) + '</span>' +
+        '<span class="cd">' + (ready ? tr("✅ Siap panen!", "✅ Ready to harvest!") : mmss(rAt - t)) + '</span>' +
+        (!ready && premiumActive() ? '<span class="tiny muted">⚡ ' + fmtGrowMin(c.grow) + ' ' + tr("menit", "min") + '</span>' : '') +
         '<span class="pbar"><i style="width:' + pct + '%"></i></span>';
     }
     (function(idx){ b.onclick = function(){ plotTap(idx); }; })(i);
@@ -1221,7 +1300,7 @@ function scrollToFirstReadyPlot(){
   var t = nowMs();
   for (var i=0;i<S.plots.length;i++) {
     var p = S.plots[i];
-    if (p && t >= p.readyAt) {
+    if (p && t >= effReadyAt(p)) {
       var el = $("plot-" + i);
       if (el) {
         el.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -1239,17 +1318,19 @@ function plotTap(i){
     var c = cropById(S.selectedSeed);
     if (S.th < (c.thReq || 1)) { toast(tr("🔒 " + cName(c) + " terkunci — terbuka di Balai Kota Lv " + c.thReq, "🔒 " + cName(c) + " is locked — unlocks at Town Hall Lv " + c.thReq)); haptic("error"); return; }
     if (!spendCoins(c.seed)) { renderStatus(); return; }
+    /* readyAt selalu menyimpan waktu tumbuh normal; percepatan
+       Premium diterapkan dinamis lewat effReadyAt(). */
     S.plots[i] = { crop: c.id, plantedAt: t, readyAt: t + c.grow*1000 };
     track("plant", 1); addXp(1);
     toast(c.em + " " + cName(c) + " " + tr("ditanam", "planted")); haptic();
-  } else if (t >= p.readyAt) {
+  } else if (t >= effReadyAt(p)) {
     var c2 = cropById(p.crop);
     S.inv[c2.id] = (S.inv[c2.id]||0) + 1;
     S.plots[i] = null;
     track("harvest", 1); addXp(c2.xp);
     toast(c2.em + " " + cName(c2) + " " + tr("dipanen → gudang", "harvested → storage")); haptic("success");
   } else {
-    toast(tr("⏱️ Belum siap — tunggu ", "⏱️ Not ready yet — wait ") + mmss(p.readyAt - t)); haptic();
+    toast(tr("⏱️ Belum siap — tunggu ", "⏱️ Not ready yet — wait ") + mmss(effReadyAt(p) - t)); haptic();
     return;
   }
   save(); renderAll();
@@ -1285,6 +1366,14 @@ function renderPens(){
     var FR = FEED_RECIPES[type], FRC = cropById(FR.crop), haveCrop = S.inv[FR.crop]||0, stockNow = S.feedStock[type]||0;
     var canMake = haveCrop >= FR.need && stockNow + FR.out <= FEED_STOCK_MAX;
     html += '<div class="row" style="margin-bottom:8px"><button class="btn-green grow" data-act="makefeed" data-type="' + type + '"' + (canMake ? "" : " disabled") + '>🌱 ' + tr("Buat Pakan", "Make Feed") + ' · ' + FR.need + ' ' + FRC.em + ' → ' + FR.out + ' 🌾</button></div>';
+    /* Pakan Campuran Ayam — hanya di kandang ayam: stok terpisah + tombol buat di samping resep biasa */
+    if (type === "ayam") {
+      var MR = MIX_FEED_RECIPE, MC1 = cropById(MR.crop1), MC2 = cropById(MR.crop2);
+      var mixStock = S.mixFeedStock||0, mixHave1 = S.inv[MR.crop1]||0, mixHave2 = S.inv[MR.crop2]||0;
+      var canMix = mixHave1 >= MR.need1 && mixHave2 >= MR.need2 && mixStock + MR.out <= FEED_STOCK_MAX;
+      html += '<div class="row-between" style="margin-bottom:8px"><span class="small">🥗 ' + tr("Stok Pakan Campuran Ayam: ", "Chicken Mixed Feed stock: ") + '<b>' + mixStock + ' / ' + FEED_STOCK_MAX + '</b> · ' + tr("1 pakan = kenyang 20 menit", "1 feed = 20 min fed") + '</span></div>';
+      html += '<div class="row" style="margin-bottom:8px"><button class="btn-green grow" data-act="makemixfeed"' + (canMix ? "" : " disabled") + '>🌱 ' + tr("Buat Pakan Campuran", "Make Mixed Feed") + ' · ' + MR.need1 + ' ' + MC1.em + ' + ' + MR.need2 + ' ' + MC2.em + ' → ' + MR.out + ' 🥗 · ' + tr("Stok: ", "Stock: ") + mixStock + '/' + FEED_STOCK_MAX + '</button></div>';
+    }
     html += '<div class="row" style="margin-bottom:8px"><button class="btn-green grow" data-act="feedall" data-type="' + type + '"' + (list.length ? "" : " disabled") + '>🍽️ ' + tr("Beri Pakan Semua", "Feed All") + '</button></div>';
     }
     html += '<div class="row" style="margin-bottom:10px"><button class="btn-green grow" data-act="collectall" data-type="' + type + '"' + (readyCount ? "" : " disabled") + '>🧺 ' + tr("Ambil Semua", "Collect All") + (readyCount ? ' · ' + readyCount + ' ' + A.pem : '') + '</button>' +
@@ -1321,6 +1410,7 @@ function renderPens(){
         '<div class="row small" style="margin:5px 0"><span>⏱️ ' + tr("Produk berikutnya: ", "Next product: ") + '<span class="cd">' + nextTxt + '</span></span><span>🌾 ' + tr("Sisa kenyang: ", "Feed left: ") + '<span class="cd">' + fedTxt + '</span></span></div>' +
         '<div class="row"><button class="btn-green btn-small" data-act="collect" data-uid="' + a.uid + '"' + (a.ready > 0 ? "" : " disabled") + '>' + tr("Ambil ", "Collect ") + A.pem + ' ' + (a.ready||0) + '/' + STACK_MAX + '</button>' +
         '<button class="btn-amber btn-small" data-act="feed" data-uid="' + a.uid + '">' + tr("Beri Pakan", "Feed") + '</button>' +
+        (a.type === "ayam" ? '<button class="btn-amber btn-small" data-act="feedmix" data-uid="' + a.uid + '">' + tr("Beri Pakan Campuran 🥗", "Mixed Feed 🥗") + '</button>' : '') +
         '<button class="btn-danger btn-small" data-act="sell" data-uid="' + a.uid + '">' + (a.type === "ayam" ? animalIcon("ayam") + " " : "") + tr("Jual ", "Sell ") + aName(A) + ' #' + a.num + ' · +' + fmt(A.sellBack) + ' 🪙</button></div>';
       cwrap.appendChild(d);
     });
@@ -1347,7 +1437,9 @@ function renderPens(){
         S.animals.forEach(function(x){ if (x.type === type && x.ready > 0) { n += collectAnimal(x, true); } });
         if (n) { toast(tr("🧺 " + n + " produk diambil dari kandang", "🧺 " + n + " products collected from the pen")); haptic("success"); save(); renderAll(); }
       } else if (act === "feed" && a) feedAnimal(a);
+      else if (act === "feedmix" && a) feedAnimalMix(a);
       else if (act === "makefeed") makeFeed(type);
+      else if (act === "makemixfeed") makeMixFeed();
       else if (act === "feedall") feedAllAnimals(type);
       else if (act === "collect" && a) { collectAnimal(a); save(); renderAll(); }
       else if (act === "sell" && a) {
@@ -1568,6 +1660,7 @@ function renderPremium(){
     '<ul class="premium-benefits small">' +
       '<li>🌾 ' + tr("Hasil panen 2× — koin dari menjual hasil panen & produk ternak jadi 2× lipat", "2× harvest returns — coins from selling crops & animal products are doubled") + '</li>' +
       '<li>🌱 ' + tr("+1 petak tambahan gratis, di atas batas Balai Kota", "+1 free extra plot, above the Town Hall limit") + '</li>' +
+      '<li>⚡ ' + tr("Tanaman tumbuh 25% lebih cepat", "Crops grow 25% faster") + '</li>' +
       '<li>🎁 ' + tr("Hadiah harian ", "Daily reward of ") + fmt(PREMIUM_DAILY_COINS) + tr(" koin, bisa diklaim tiap hari selama pass aktif", " coins, claimable every day while the pass is active") + '</li>' +
     '</ul>' +
     '<div class="row">' +
@@ -1605,16 +1698,120 @@ function renderPremium(){
   });
 }
 
+/* ================= TARIK GRAM MANUAL (CARA A) =================
+   Pemain mengajukan permintaan tarik (jumlah + alamat dompet TON);
+   saldo Gram langsung berkurang dan permintaan tercatat berstatus
+   "menunggu". Pemain menyalin teks permintaan dan mengirimnya ke
+   pemilik game, yang mengirim Gram-nya secara manual lewat Tonkeeper.
+   Setelah menerima, pemain menekan "Saya Sudah Menerima" (status jadi
+   "selesai"); bila pemilik belum mengirim / menolak, pemain bisa
+   "Batalkan" dan saldonya kembali penuh — tetapi hanya selama
+   10 menit pertama sejak pengajuan; lewat dari itu tombol Batalkan
+   nonaktif dengan keterangan "Tidak bisa dibatalkan lagi".
+   Maksimal total 1 Gram per hari per pemain (permintaan Menunggu +
+   Selesai hari itu). */
+var WD_MIN_GRAM = 0.5, WD_MAX_PER_DAY = 1;
+/* Batas waktu batal: permintaan "menunggu" hanya bisa dibatalkan selama
+   10 menit pertama sejak diajukan (dihitung dari createdAt permintaan).
+   Lewat dari itu tombol Batalkan nonaktif — pemain hanya bisa menunggu
+   pemilik mengirim lalu menekan "Saya Sudah Menerima". */
+var WD_CANCEL_WINDOW_MS = 10 * 60 * 1000;
+function wdCanCancel(w){
+  return w.status === "menunggu" && typeof w.createdAt === "number" && w.createdAt > 0 &&
+    (Date.now() - w.createdAt) <= WD_CANCEL_WINDOW_MS;
+}
+function ensureWithdrawals(){
+  if (!Array.isArray(S.withdrawals)) S.withdrawals = [];
+  S.withdrawals.forEach(function(w, i){
+    if (!w.id) w.id = "w" + (w.createdAt || i) + "_" + i;
+    /* Save lama: penarikan simulasi tanpa status/dianggap sudah selesai */
+    if (!w.status) w.status = "selesai";
+    if (typeof w.amount !== "number") w.amount = parseFloat(w.amount) || 0;
+    if (typeof w.wallet !== "string") w.wallet = "";
+    if (typeof w.date !== "string") w.date = "";
+  });
+}
+function wdTodayTotal(){
+  var t = todayStr(), sum = 0;
+  S.withdrawals.forEach(function(w){ if (w.date === t && w.status !== "dibatalkan") sum += w.amount; });
+  return Math.round(sum * 10000) / 10000;
+}
+function wdStatusInfo(w){
+  if (w.status === "selesai") return { cls: "done", label: tr("✅ Selesai", "✅ Completed") };
+  if (w.status === "dibatalkan") return { cls: "cancel", label: tr("✖ Dibatalkan", "✖ Cancelled") };
+  return { cls: "wait", label: tr("⏳ Menunggu", "⏳ Pending") };
+}
+function withdrawalRequestText(w){
+  return "🏧 " + tr("Permintaan Tarik Gram — Farming Season", "Gram Withdrawal Request — Farming Season") + "\n" +
+    tr("Jumlah: ", "Amount: ") + fmtGram(w.amount) + " Gram\n" +
+    tr("Alamat dompet TON: ", "TON wallet address: ") + w.wallet + "\n" +
+    tr("Tanggal: ", "Date: ") + w.date + "\n" +
+    tr("Status: Menunggu", "Status: Pending");
+}
+function copyWithdrawal(id){
+  var w = S.withdrawals.find(function(x){ return x.id === id; });
+  if (!w) return;
+  copyText(withdrawalRequestText(w), tr("📋 Permintaan penarikan disalin — kirim ke pemilik game ya", "📋 Withdrawal request copied — send it to the game owner"));
+}
+function confirmWithdrawalReceived(id){
+  var w = S.withdrawals.find(function(x){ return x.id === id; });
+  if (!w || w.status !== "menunggu") return;
+  w.status = "selesai";
+  toast(tr("✅ Penarikan ", "✅ Withdrawal of ") + fmtGram(w.amount) + tr(" Gram ditandai Selesai — terima kasih!", " Gram marked as Completed — thank you!")); haptic("success");
+  save(); renderAll();
+}
+function cancelWithdrawal(id){
+  var w = S.withdrawals.find(function(x){ return x.id === id; });
+  if (!w || w.status !== "menunggu") return;
+  if (!wdCanCancel(w)) {
+    toast(tr("⏰ Sudah lewat 10 menit — permintaan ini tidak bisa dibatalkan lagi", "⏰ More than 10 minutes have passed — this request can no longer be cancelled")); haptic("error");
+    renderAll();
+    return;
+  }
+  w.status = "dibatalkan";
+  S.gram += w.amount; /* saldo dikembalikan penuh */
+  toast(tr("↩️ Penarikan dibatalkan — ", "↩️ Withdrawal cancelled — ") + fmtGram(w.amount) + tr(" Gram kembali ke saldomu", " Gram returned to your balance")); haptic();
+  save(); renderAll();
+}
+
 /* ================= RENDER: GRAM & TOKO ================= */
 function renderGram(){
   renderPremium();
   $("gram-bal").textContent = fmtGram(S.gram);
   renderTonWallet();
+  ensureWithdrawals();
+  /* Isi awal alamat dompet dari dompet TON yang terhubung (bisa diubah) */
+  var wIn = $("wd-wallet");
+  if (wIn && !wIn.value && tonWalletFriendly) wIn.value = tonWalletFriendly;
+  var quotaEl = $("wd-quota");
+  if (quotaEl) {
+    var usedToday = wdTodayTotal(), leftToday = Math.max(0, Math.round((WD_MAX_PER_DAY - usedToday) * 10000) / 10000);
+    quotaEl.textContent = tr("Sudah diajukan hari ini: ", "Requested today: ") + fmtGram(usedToday) + " Gram · " +
+      tr("Sisa kuota hari ini: ", "Daily quota left: ") + fmtGram(leftToday) + " Gram";
+  }
   var hist = $("wd-history");
   if (S.withdrawals.length) {
-    hist.innerHTML = '<div class="divider"></div><h3>' + tr("Riwayat Penarikan (Simulasi)", "Withdrawal History (Simulation)") + '</h3>' + S.withdrawals.slice().reverse().map(function(w){
-      return '<div class="hist-row"><span>' + w.date + '</span><span>-' + fmtGram(w.amount) + ' Gram</span><span class="muted">' + tr("Terkirim (simulasi)", "Sent (simulation)") + '</span></div>';
+    hist.innerHTML = '<div class="divider"></div><h3>' + tr("Riwayat Penarikan", "Withdrawal History") + '</h3>' + S.withdrawals.slice().reverse().map(function(w){
+      var st = wdStatusInfo(w);
+      var html = '<div class="wd-req"><div class="row-between"><b>💎 ' + fmtGram(w.amount) + ' Gram</b>' +
+        '<span class="wd-status ' + st.cls + '">' + st.label + '</span></div>' +
+        '<div class="small muted" style="margin-top:4px">📅 ' + esc(w.date) + '</div>';
+      if (w.wallet) html += '<div class="wd-addr" style="margin-top:3px">' + esc(w.wallet) + '</div>';
+      if (w.status === "menunggu") {
+        html += '<p class="small muted" style="margin-top:6px">' + tr("Salin permintaan ini dan kirim ke pemilik game. Setelah Gram-nya kamu terima, tekan “Saya Sudah Menerima”.", "Copy this request and send it to the game owner. Once you receive the Gram, tap “I Have Received It”.") + '</p>' +
+          '<div class="row" style="margin-top:6px"><button class="btn-small grow" data-wd-copy="' + w.id + '">📋 ' + tr("Salin Permintaan", "Copy Request") + '</button></div>' +
+          '<p class="small muted" style="margin-top:5px">' + tr("Setelah menyalin, kirim ke @Farm_simulatorbot", "After copying, send it to @Farm_simulatorbot") + '</p>' +
+          '<div class="row" style="margin-top:6px"><button class="btn-small btn-green grow" data-wd-done="' + w.id + '">✅ ' + tr("Saya Sudah Menerima", "I Have Received It") + '</button>' +
+          '<button class="btn-small btn-danger grow" data-wd-cancel="' + w.id + '"' + (wdCanCancel(w) ? '' : ' disabled') + '>' + tr("Batalkan", "Cancel") + '</button></div>' +
+          (wdCanCancel(w) ? '<p class="small muted" style="margin-top:5px">' + tr("Penarikan tidak bisa dibatalkan setelah 10 menit.", "Withdrawals cannot be cancelled after 10 minutes.") + '</p>' : '<p class="small muted" style="margin-top:5px">' + tr("Tidak bisa dibatalkan lagi", "Can no longer be cancelled") + '</p>');
+      } else if (w.status === "dibatalkan") {
+        html += '<p class="small muted" style="margin-top:6px">' + tr("Saldo Gram sudah dikembalikan penuh ke dompet Gram kamu.", "The Gram balance has been fully returned to your Gram wallet.") + '</p>';
+      }
+      return html + '</div>';
     }).join("");
+    hist.querySelectorAll("button[data-wd-copy]").forEach(function(b){ b.onclick = function(){ copyWithdrawal(b.dataset.wdCopy); }; });
+    hist.querySelectorAll("button[data-wd-done]").forEach(function(b){ b.onclick = function(){ confirmWithdrawalReceived(b.dataset.wdDone); }; });
+    hist.querySelectorAll("button[data-wd-cancel]").forEach(function(b){ b.onclick = function(){ cancelWithdrawal(b.dataset.wdCancel); }; });
   } else hist.innerHTML = "";
   var shop = $("shop-list"); shop.innerHTML = "";
   SHOP.forEach(function(it){
@@ -1707,9 +1904,22 @@ function renderAll(){
   renderMarket(); renderDailyClaim(); renderMissions(); renderGram(); renderFriends();
 }
 /* render ringan tiap detik: hanya hitung mundur & status */
+var lastGrowFactor = null;
+var lastWdCancelSig = null;
 function tickRender(){
   S.animals.forEach(settleAnimal);
   renderStatus(); renderTH(); renderBalaiKota(); renderPlots(); renderPens(); renderDailyClaim(); renderMissions(); renderFriends(); renderPremium();
+  /* Batas waktu batal penarikan: bila ada permintaan "menunggu" yang baru
+     saja melewati 10 menit, render ulang tab Gram agar tombol Batalkan
+     langsung nonaktif tanpa pemain harus berpindah tab dulu. */
+  if (Array.isArray(S.withdrawals)) {
+    var wdSig = S.withdrawals.map(function(w){ return w.status === "menunggu" ? w.id + ":" + (wdCanCancel(w) ? "1" : "0") : ""; }).join("|");
+    if (lastWdCancelSig === null) lastWdCancelSig = wdSig;
+    else if (wdSig !== lastWdCancelSig) { lastWdCancelSig = wdSig; renderGram(); }
+  }
+  /* Bila status Premium berubah (dibeli / habis), waktu tumbuh di
+     tombol benih ikut diperbarui tanpa menunggu render penuh. */
+  if (lastGrowFactor !== growFactor()) { lastGrowFactor = growFactor(); renderSeeds(); }
 }
 </script>
 
@@ -1835,13 +2045,24 @@ $("btn-exchange").addEventListener("click", function(){
 });
 $("btn-withdraw").addEventListener("click", function(){
   if (S.th < 4) { toast(tr("🔒 Butuh Balai Kota Level 4", "🔒 Requires Town Hall Level 4")); haptic("error"); return; }
-  if (!tonConnected()) { toast(tr("Hubungkan dompet TON dulu", "Connect your TON wallet first")); haptic("error"); return; }
-  var v = parseFloat($("wd-input").value) || 0;
-  if (v < 0.5) { toast(tr("Minimal tarik 0,5 Gram", "Minimum withdrawal is 0.5 Gram")); haptic("error"); return; }
+  var v = Math.round((parseFloat($("wd-input").value) || 0) * 10000) / 10000;
+  var wallet = $("wd-wallet").value.trim();
+  if (v < WD_MIN_GRAM) { toast(tr("Minimal tarik 0,5 Gram", "Minimum withdrawal is 0.5 Gram")); haptic("error"); return; }
+  if (!wallet) { toast(tr("Isi alamat dompet TON kamu dulu", "Enter your TON wallet address first")); haptic("error"); return; }
+  /* Alamat TON ramah-pengguna: 48 karakter base64url (UQ…/EQ…/kQ…/0Q…),
+     atau alamat raw bentuk "0:abcdef…" (2 + 64 hex). */
+  var walletOk = /^[A-Za-z0-9_-]{48}$/.test(wallet) || /^[0-9a-fA-F]{2}:[0-9a-fA-F]{64}$/.test(wallet);
+  if (!walletOk) { toast(tr("⚠️ Alamat dompet TON tidak valid — periksa lagi ya", "⚠️ That TON wallet address doesn't look valid — please check it")); haptic("error"); return; }
   if (S.gram < v) { toast(tr("💎 Gram tidak cukup", "💎 Not enough Gram")); haptic("error"); return; }
-  S.gram -= v;
-  S.withdrawals.push({ date: todayStr(), amount: v });
-  toast("🏧 " + fmtGram(v) + tr(" Gram ditarik (simulasi)", " Gram withdrawn (simulation)")); haptic("success");
+  var usedToday = wdTodayTotal();
+  if (usedToday + v > WD_MAX_PER_DAY + 1e-9) {
+    var leftToday = Math.max(0, Math.round((WD_MAX_PER_DAY - usedToday) * 10000) / 10000);
+    toast(tr("⏳ Batas tarik 1 Gram per hari — sisa kuota hari ini ", "⏳ Daily withdrawal limit is 1 Gram — quota left today: ") + fmtGram(leftToday) + " Gram"); haptic("error"); return;
+  }
+  S.gram -= v; /* saldo langsung berkurang saat permintaan diajukan */
+  ensureWithdrawals();
+  S.withdrawals.push({ id: "w" + nowMs() + "_" + Math.floor(Math.random()*100000), date: todayStr(), createdAt: nowMs(), amount: v, wallet: wallet, status: "menunggu" });
+  toast(tr("🏧 Permintaan tarik ", "🏧 Withdrawal request for ") + fmtGram(v) + tr(" Gram diajukan — salin permintaannya dan kirim ke pemilik game", " Gram submitted — copy the request and send it to the game owner")); haptic("success");
   $("wd-input").value = "";
   save(); renderAll();
 });
@@ -1928,10 +2149,15 @@ function applyStaticTexts(){
   set("btn-exchange", tr("Tukar", "Exchange"));
   setPh("ex-input", tr("Jumlah koin, mis. 100000", "Amount of coins, e.g. 100000"));
   set("wd-title", tr("🏧 Tarik Gram", "🏧 Withdraw Gram"));
-  setH("wd-info", tr("Minimal tarik <b>0,5 Gram</b> · Terbuka di <b>Balai Kota Level 4</b>", "Minimum withdrawal <b>0.5 Gram</b> · Unlocks at <b>Town Hall Level 4</b>"));
+  setH("wd-info", tr("Minimal tarik <b>0,5 Gram</b> · Maksimal <b>1 Gram per hari</b> · Terbuka di <b>Balai Kota Level 4</b>", "Minimum withdrawal <b>0.5 Gram</b> · Maximum <b>1 Gram per day</b> · Unlocks at <b>Town Hall Level 4</b>"));
   set("withdraw-lock", tr("🔒 Penarikan Gram terkunci — naikkan Balai Kota ke Level 4 dulu.", "🔒 Gram withdrawal is locked — upgrade your Town Hall to Level 4 first."));
+  set("wd-amount-label", tr("Jumlah Gram", "Amount of Gram"));
+  set("wd-wallet-label", tr("Alamat dompet TON kamu", "Your TON wallet address"));
   setPh("wd-input", tr("Jumlah Gram, mis. 0.5", "Amount of Gram, e.g. 0.5"));
-  set("btn-withdraw", tr("Tarik", "Withdraw"));
+  setPh("wd-wallet", tr("Alamat dompet TON (UQ… / EQ…)", "TON wallet address (UQ… / EQ…)"));
+  set("wd-addr-warn", tr("⚠️ Pastikan alamat dompet benar — Gram yang terkirim ke alamat yang salah tidak bisa kembali.", "⚠️ Make sure your wallet address is correct — Gram sent to the wrong address cannot be returned."));
+  set("btn-withdraw", tr("Ajukan Penarikan", "Request Withdrawal"));
+  set("wd-cancel-note", tr("Penarikan tidak bisa dibatalkan setelah 10 menit.", "Withdrawals cannot be cancelled after 10 minutes."));
   set("shop-title", tr("💎 Toko Premium", "💎 Premium Shop"));
   set("invite-title", tr("👥 Undang Teman", "👥 Invite Friends"));
   setH("invite-desc", tr("Bagikan kode undanganmu. Setiap teman yang bergabung memberimu <b>+100 🪙 +10 XP</b>.", "Share your invite code. Every friend who joins gives you <b>+100 🪙 +10 XP</b>."));
@@ -1962,6 +2188,7 @@ applyStaticTexts();
 ensureDaily();
 /* normalisasi petak (termasuk +1 petak Premium Pass bila aktif) */
 if (S.lb) delete S.lb; /* bersihkan data leaderboard lama dari save */
+ensureWithdrawals(); /* normalisasi riwayat Tarik Gram lama (tanpa status → selesai) */
 if (typeof S.premiumUntil !== "number") S.premiumUntil = 0;
 if (typeof S.premiumLastClaim !== "string") S.premiumLastClaim = "";
 ensureDailyClaimState();
