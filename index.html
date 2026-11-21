@@ -351,6 +351,11 @@
         <div id="pens"></div>
       </section>
 
+      <!-- TAMBANG -->
+      <section class="tabpage" id="page-tambang">
+        <div id="tambang-content"></div>
+      </section>
+
       <!-- PASAR -->
       <section class="tabpage" id="page-pasar">
         <div class="card">
@@ -511,6 +516,7 @@
     <nav class="tabbar">
       <button data-tab="kebun" class="active"><span class="tic">🌾</span><span class="tab-label">Kebun</span><span class="tab-badge" id="badge-kebun" style="display:none">0</span></button>
       <button data-tab="ternak"><span class="tic">🐄</span><span class="tab-label">Ternak</span><span class="tab-badge" id="badge-ternak" style="display:none">0</span></button>
+      <button data-tab="tambang"><span class="tic">⛏️</span><span class="tab-label">Tambang</span></button>
       <button data-tab="pasar"><span class="tic">🏪</span><span class="tab-label">Pasar</span></button>
       <button data-tab="misi"><span class="tic">📋</span><span class="tab-label">Misi</span><span class="tab-badge" id="badge-misi" style="display:none">0</span></button>
       <button data-tab="gram"><span class="tic">💎</span><span class="tab-label">Gram</span></button>
@@ -535,8 +541,8 @@ var CROPS = [
 ];
 var ANIMALS = {
   ayam:  {name:"Ayam", nameEn:"Chicken",  em:"🐓", buy:120, sellBack:60,  thReq:1, cycle:5*60,  feed:15, product:"telur", pem:"🥚", pname:"Telur", pnameEn:"Egg", psell:8,  sound:"Petok petok petok!", soundEn:"Cluck cluck cluck!"},
-  sapi:  {name:"Sapi", nameEn:"Cow",  em:"🐄", buy:350, sellBack:175, thReq:2, cycle:10*60, feed:45, product:"susu",  pem:"🥛", pname:"Susu", pnameEn:"Milk",  psell:25, sound:"Moooo!", soundEn:"Moooo!"},
-  domba: {name:"Domba", nameEn:"Sheep", em:"🐑", buy:300, sellBack:150, thReq:3, cycle:15*60, feed:65, product:"wol",   pem:"🧶", pname:"Wol", pnameEn:"Wool",   psell:35, sound:"Mbeeek!", soundEn:"Baaa!"}
+  sapi:  {name:"Sapi", nameEn:"Cow",  em:"🐄", buy:350, sellBack:175, thReq:2, cycle:10*60, feed:25, product:"susu",  pem:"🥛", pname:"Susu", pnameEn:"Milk",  psell:15, sound:"Moooo!", soundEn:"Moooo!"},
+  domba: {name:"Domba", nameEn:"Sheep", em:"🐑", buy:300, sellBack:150, thReq:3, cycle:15*60, feed:35, product:"wol",   pem:"🧶", pname:"Wol", pnameEn:"Wool",   psell:20, sound:"Mbeeek!", soundEn:"Baaa!"}
 };
 var TH_MAXPLOTS = [3,12,16,20,25];
 var TH_UPGRADE  = [0,20000,30000,40000,50000]; /* index = level tujuan */
@@ -550,11 +556,32 @@ var FEED_STOCK_MAX = 20, FED_MAX_MS = 60*60*1000, ANIMAL_MAX = 5;
    (tidak ada hasil ke-6) sampai tumpukannya diambil — lewat tombol
    Ambil per hewan atau Ambil Semua. Berlaku untuk ayam, sapi, domba. */
 var STACK_MAX = 5;
-/* Resep Buat Pakan dari hasil panen di gudang — dibuat SEDIKIT lebih hemat
-   daripada membeli pakan pakai koin:
+/* ================= TAMBANG (terbuka di Balai Kota Lv 4) =================
+   Sistem waktu seperti tanaman & ternak — BUKAN ketuk / tap-to-earn.
+   Penambang dibeli 1.000 koin (maks 3), dijual kembali 500 koin. Tiap
+   penambang bekerja sendiri: 1 Batu tiap 30 menit, menumpuk sampai
+   5 Batu (STACK_MAX, sama seperti tumpukan ternak) lalu berhenti
+   sampai diambil. Penambang TIDAK butuh makan (tanpa sistem pakan),
+   tetapi ada BIAYA PERAWATAN 10 koin per penambang yang dibayar
+   MANUAL lewat tombol "🔧 Bayar Perawatan · 10 koin" di kartu tiap
+   penambang: TIDAK ada potongan otomatis — koin pemain tidak pernah
+   berkurang tanpa pemain menekan tombol itu. Sekali bayar, penambang
+   bekerja selama 1 jam ke depan; bila masa perawatan itu habis dan
+   belum dibayar lagi, penambang JEDA berproduksi sampai pemain
+   menekan tombol Bayar Perawatan lagi. Batu masuk gudang sebagai
+   item "bijih" (kunci simpan lama, nama tampilannya "Batu") dan
+   dijual di Pasar 25 koin — harga normal untuk semua pemain,
+   tanpa pengganda Premium. */
+var MINER_BUY = 1000, MINER_SELLBACK = 500, MINER_MAX = 3;
+var MINER_CYCLE = 30*60; /* detik per 1 Batu */
+var ORE_SELL = 25; /* harga jual 1 Batu di Pasar */
+var MINER_UPKEEP = 10; /* biaya perawatan per penambang, dibayar manual per 1 jam kerja */
+var MINER_UPKEEP_MS = 60*60*1000; /* 1 jam dalam ms — masa kerja per 1× pembayaran perawatan */
+/* Resep Buat Pakan dari hasil panen di gudang (resep tidak berubah;
+   angka "hemat" dihitung dari harga beli pakan saat ini):
    Ayam : 2 Wortel  (jual 36 🪙)  → 3 pakan (beli 45 🪙)  = hemat 9 🪙
-   Sapi : 3 Kentang (jual 84 🪙)  → 2 pakan (beli 90 🪙)  = hemat 6 🪙
-   Domba: 3 Tomat   (jual 114 🪙) → 2 pakan (beli 130 🪙) = hemat 16 🪙 */
+   Sapi : 3 Kentang (jual 84 🪙)  → 2 pakan (beli 50 🪙)  = hemat -34 🪙
+   Domba: 3 Tomat   (jual 114 🪙) → 2 pakan (beli 70 🪙)  = hemat -44 🪙 */
 var FEED_RECIPES = {
   ayam:  { crop:"wortel",  need:2, out:3 },
   sapi:  { crop:"kentang", need:3, out:2 },
@@ -822,6 +849,8 @@ function freshState() {
     selectedSeed: "wortel",
     inv: {}, /* itemId -> jumlah (tanaman + telur/susu/wol) */
     animals: [], /* {uid,type,num,fedUntil,nextAt,remainingMs,ready} */
+    miners: [], /* {uid,num,nextAt,remainingMs,ready,upkeepUntil,upkeepRemainingMs,pausedUpkeep} — penambang tambang (TH Lv 4); upkeepUntil = batas masa perawatan berbayar (manual), upkeepRemainingMs = sisa masa berbayar yang dibekukan saat tumpukan penuh, pausedUpkeep = jeda karena masa perawatan habis/belum dibayar */
+    minerSeq: 0,
     feedStock: {ayam:0, sapi:0, domba:0},
     mixFeedStock: 0, /* stok Pakan Campuran Ayam (khusus ayam, maks FEED_STOCK_MAX) */
     animalSeq: {ayam:0, sapi:0, domba:0},
@@ -874,6 +903,7 @@ function cropById(id){ for (var i=0;i<CROPS.length;i++) if (CROPS[i].id===id) re
 function itemInfo(id){
   var c = cropById(id); if (c) return {name:cName(c), em:c.em, sell:c.sell};
   for (var k in ANIMALS) if (ANIMALS[k].product===id) return {name:pName(ANIMALS[k]), em:ANIMALS[k].pem, sell:ANIMALS[k].psell};
+  if (id === "bijih") return {name:"Batu", em:"⛏️", sell:ORE_SELL};
   return {name:id, em:"📦", sell:0};
 }
 function playerLevel(){ return Math.floor(Math.sqrt(S.xp/200)) + 1; }
@@ -897,7 +927,11 @@ function spendCoins(n){ if (S.coins < n) { toast(tr("🪙 Koin tidak cukup", "�
 var PREMIUM_PRICE_GRAM = 0.5, PREMIUM_DAYS = 30, PREMIUM_DAILY_COINS = 1000;
 function premiumActive(){ return !!(S && S.premiumUntil && S.premiumUntil > nowMs()); }
 function premiumDaysLeft(){ if (!premiumActive()) return 0; return Math.ceil((S.premiumUntil - nowMs()) / 86400000); }
-function sellMultiplier(){ return premiumActive() ? 2 : 1; }
+/* Benefit harga jual 2× Premium Pass DIHAPUS: harga jual di Pasar
+   selalu harga normal untuk semua pemain, termasuk pemilik Premium
+   Pass. Fungsi ini dipertahankan agar pemanggil lama tetap bekerja,
+   tetapi selalu mengembalikan 1 (tanpa pengganda). */
+function sellMultiplier(){ return 1; }
 function effectivePlots(){ return S.plotsOwned + (premiumActive() ? 1 : 0); }
 /* Percepatan tanaman Premium Pass: selama pass aktif, waktu tumbuh
    dikali 0,75 (25% lebih cepat). readyAt yang tersimpan tetap waktu
@@ -1139,6 +1173,247 @@ function collectAnimal(a, silent){
   return n;
 }
 
+/* ================= LOGIKA TAMBANG =================
+   Penambang bekerja sendiri berdasarkan waktu nyata (seperti ternak,
+   tapi TANPA pakan — penambang tidak pernah lapar). Tiap siklus
+   30 menit yang selesai menambah 1 Batu ke tumpukan penambang itu
+   (m.ready), SAMPAI tumpukan penuh STACK_MAX (5): saat itu timer
+   berhenti dan tidak ada Batu ke-6 sampai tumpukannya diambil.
+   BIAYA PERAWATAN — MANUAL, TIDAK ADA POTONGAN OTOMATIS: fungsi ini
+   TIDAK PERNAH mengurangi koin pemain. Penambang hanya bekerja
+   selama masa perawatan yang sudah DIBAYAR lewat tombol
+   "🔧 Bayar Perawatan · 10 koin" di kartunya (m.upkeepUntil =
+   batas akhir masa berbayar; 1× bayar = 1 jam kerja). Bila masa
+   itu habis, penambang JEDA (pausedUpkeep): timer produksinya
+   dibekukan di tempat sampai pemain menekan tombol Bayar
+   Perawatan lagi. Tombol itu hanya aktif saat masa perawatan
+   habis (sedang jeda); selama masa berbayar masih tersisa, tombol
+   nonaktif dan menampilkan sisa waktunya. Saat tumpukan penuh,
+   sisa masa berbayar ikut dibekukan (m.upkeepRemainingMs) agar
+   tidak hangus selagi penambang berhenti karena penuh. */
+/* Sisa masa perawatan berbayar penambang ini dalam ms (0 = habis/jeda). */
+function minerPaidMs(m, t){
+  if (m.upkeepUntil) return Math.max(0, m.upkeepUntil - t);
+  if (typeof m.upkeepRemainingMs === "number" && m.upkeepRemainingMs > 0) return m.upkeepRemainingMs;
+  return 0;
+}
+/* Format sisa masa perawatan, mis. "42 menit lagi" / "1 jam 5 menit lagi". */
+function fmtPaidLeft(ms){
+  var totalMin = Math.max(1, Math.ceil(ms/60000));
+  if (totalMin >= 60) {
+    var h = Math.floor(totalMin/60), mm = totalMin % 60;
+    return tr(h + " jam" + (mm ? " " + mm + " menit" : "") + " lagi", h + "h" + (mm ? " " + mm + "m" : "") + " left");
+  }
+  return tr(totalMin + " menit lagi", totalMin + " min left");
+}
+function settleMiner(m){
+  var t = nowMs();
+  if (typeof m.ready !== "number") m.ready = m.ready ? 1 : 0; /* save lama */
+  /* Migrasi save lama (perawatan potong otomatis, field upkeepNextAt):
+     sisa jam kerja yang sedang berjalan dianggap masa berbayar sampai
+     batasnya — TANPA memotong koin apa pun; setelah itu penambang jeda
+     dan menunggu pembayaran manual. Penambang yang dulu jeda karena
+     koin tidak cukup tetap jeda dengan masa berbayar 0. */
+  if ("upkeepNextAt" in m) {
+    if (m.pausedUpkeep) { m.upkeepUntil = null; m.upkeepRemainingMs = 0; }
+    else if (m.upkeepNextAt) { m.upkeepUntil = m.upkeepNextAt; m.upkeepRemainingMs = 0; }
+    else { m.upkeepUntil = null; if (typeof m.upkeepRemainingMs !== "number" || isNaN(m.upkeepRemainingMs)) m.upkeepRemainingMs = 0; }
+    delete m.upkeepNextAt;
+  }
+  if (typeof m.upkeepUntil !== "number" || isNaN(m.upkeepUntil)) m.upkeepUntil = null;
+  if (typeof m.upkeepRemainingMs !== "number" || isNaN(m.upkeepRemainingMs)) m.upkeepRemainingMs = 0;
+  if (typeof m.pausedUpkeep !== "boolean") m.pausedUpkeep = false;
+  /* Tumpukan penuh: produksi berhenti dan sisa masa perawatan
+     berbayar dibekukan (tidak hangus selagi berhenti karena penuh). */
+  if (m.ready >= STACK_MAX) {
+    if (m.upkeepUntil) { m.upkeepRemainingMs = Math.max(0, m.upkeepUntil - t); m.upkeepUntil = null; }
+    m.pausedUpkeep = !(m.upkeepRemainingMs > 0);
+    m.nextAt = null; m.remainingMs = MINER_CYCLE*1000;
+    return;
+  }
+  /* Pulihkan jam perawatan yang dibekukan (mis. setelah tumpukan
+     yang penuh tadi diambil): sisa masa berbayar berjalan lagi. */
+  if (!m.upkeepUntil && m.upkeepRemainingMs > 0) {
+    m.upkeepUntil = t + m.upkeepRemainingMs;
+    m.upkeepRemainingMs = 0;
+  }
+  /* Belum pernah membayar / masa berbayar tidak ada: jeda — produksi
+     dibekukan, TIDAK ada koin yang dipotong, menunggu tombol ditekan. */
+  if (!m.upkeepUntil) {
+    m.pausedUpkeep = true;
+    m.nextAt = null;
+    return;
+  }
+  if (!m.nextAt) m.nextAt = t + (m.remainingMs != null ? m.remainingMs : MINER_CYCLE*1000);
+  /* Proses Batu yang selesai sampai waktu sekarang, tetapi tidak
+     melewati batas masa perawatan berbayar: Batu hanya berproduksi
+     selagi masa berbayar masih berlaku. */
+  var limit = Math.min(t, m.upkeepUntil);
+  var guard = 0;
+  while (m.nextAt && m.nextAt <= limit && guard++ < 10000) {
+    var eventAt = m.nextAt;
+    m.ready++;
+    if (m.ready >= STACK_MAX) {
+      /* Penuh tepat di tengah masa berbayar: bekukan sisanya. */
+      m.upkeepRemainingMs = Math.max(0, m.upkeepUntil - eventAt);
+      m.upkeepUntil = null;
+      m.pausedUpkeep = !(m.upkeepRemainingMs > 0);
+      m.nextAt = null; m.remainingMs = MINER_CYCLE*1000;
+      return;
+    }
+    m.nextAt += MINER_CYCLE*1000;
+  }
+  /* Masa perawatan berbayar habis: jeda — bekukan sisa waktu siklus
+     Batu di tempat; bekerja lagi hanya setelah dibayar manual. */
+  if (m.upkeepUntil <= t) {
+    m.remainingMs = m.nextAt ? Math.max(0, m.nextAt - m.upkeepUntil) : MINER_CYCLE*1000;
+    m.nextAt = null; m.upkeepUntil = null; m.upkeepRemainingMs = 0;
+    m.pausedUpkeep = true;
+    return;
+  }
+  m.pausedUpkeep = false;
+}
+function collectMiner(m, silent){
+  /* Ambil SELURUH tumpukan Batu penambang ini (0..STACK_MAX) ke gudang
+     sekaligus. Setelah kosong, penambang bekerja lagi bila masa
+     perawatan berbayarnya masih ada (termasuk sisa yang dibekukan
+     saat penuh) — bila masa berbayarnya habis, ia tetap jeda sampai
+     pemain menekan tombol Bayar Perawatan. */
+  settleMiner(m);
+  var n = (typeof m.ready === "number") ? m.ready : (m.ready ? 1 : 0);
+  if (n <= 0) return 0;
+  m.ready = 0;
+  S.inv["bijih"] = (S.inv["bijih"]||0) + n;
+  var t = nowMs();
+  if (m.upkeepUntil && m.upkeepUntil > t) {
+    m.pausedUpkeep = false;
+    if (!m.nextAt) m.nextAt = t + (m.remainingMs != null ? m.remainingMs : MINER_CYCLE*1000);
+  } else if (!m.upkeepUntil && typeof m.upkeepRemainingMs === "number" && m.upkeepRemainingMs > 0) {
+    m.upkeepUntil = t + m.upkeepRemainingMs;
+    m.upkeepRemainingMs = 0;
+    m.pausedUpkeep = false;
+    if (!m.nextAt) m.nextAt = t + (m.remainingMs != null ? m.remainingMs : MINER_CYCLE*1000);
+  } else {
+    m.pausedUpkeep = true;
+    m.nextAt = null;
+  }
+  if (!silent) { toast("⛏️ " + n + " " + tr("Batu diambil", "Batu collected")); haptic("success"); }
+  return n;
+}
+/* Bayar perawatan penambang SECARA MANUAL — satu-satunya jalan koin
+   perawatan keluar dari saldo pemain, dan hanya dari handler tombol
+   Bayar Perawatan. Tombol hanya aktif saat masa perawatan penambang
+   itu sudah habis (sedang jeda); fungsi ini juga menjaga hal yang
+   sama: bila masa berbayar masih tersisa, TIDAK ada koin yang
+   dipotong. Bila koin tidak cukup, tampilkan pesan persis
+   "Koin tidak cukup untuk membayar perawatan" dan tidak jadi bayar. */
+function payMinerUpkeep(m){
+  settleMiner(m);
+  if (minerPaidMs(m, nowMs()) > 0) return false; /* masih dalam masa berbayar — tombol seharusnya nonaktif */
+  if (S.coins < MINER_UPKEEP) {
+    toast(tr("Koin tidak cukup untuk membayar perawatan", "Not enough coins to pay for maintenance"));
+    haptic("error");
+    return false;
+  }
+  S.coins -= MINER_UPKEEP;
+  var t = nowMs();
+  m.upkeepUntil = t + MINER_UPKEEP_MS;
+  m.upkeepRemainingMs = 0;
+  m.pausedUpkeep = false;
+  if (m.ready < STACK_MAX && !m.nextAt) m.nextAt = t + (m.remainingMs != null ? m.remainingMs : MINER_CYCLE*1000);
+  toast(tr("🔧 Perawatan Penambang #", "🔧 Miner #") + m.num + tr(" dibayar — bekerja 1 jam ke depan", " maintenance paid — working for the next 1 hour"));
+  haptic("success");
+  return true;
+}
+
+/* ================= RENDER: TAMBANG =================
+   Tab ⛏️ Tambang — terbuka di Balai Kota Lv 4; sebelum itu hanya
+   tampil pesan terkunci. Sesudah terbuka: kartu Tambang berisi jumlah
+   penambang, tombol Ambil Semua & Beli Penambang, dan satu kartu per
+   penambang (tumpukan ⛏️ X/5, hitung mundur Batu berikutnya, sisa
+   masa perawatan berbayar / status jeda, tombol Bayar Perawatan —
+   hanya aktif saat masa perawatan habis; saat masih ada sisa masa,
+   tombol nonaktif & menampilkan sisa waktunya — serta tombol
+   Ambil & Jual Penambang). */
+function renderTambang(){
+  var wrap = $("tambang-content"); if (!wrap) return;
+  if (S.th < 4) {
+    wrap.innerHTML = '<div class="card"><h2>⛏️ ' + tr("Tambang", "Mine") + '</h2>' +
+      '<div class="lock-note">' + tr("🔒 Tambang terbuka di Balai Kota Lv 4", "🔒 The Mine unlocks at Town Hall Lv 4") + '</div></div>';
+    return;
+  }
+  if (!Array.isArray(S.miners)) S.miners = [];
+  S.miners.forEach(settleMiner);
+  var totalReady = S.miners.reduce(function(s2, m){ return s2 + (m.ready||0); }, 0);
+  var html = '<div class="card"><div class="row-between"><h2>⛏️ ' + tr("Tambang", "Mine") + '</h2>' +
+    '<span class="pill">👷 ' + S.miners.length + ' / ' + MINER_MAX + '</span></div>';
+  html += '<p class="small muted">' + tr("Setiap penambang menghasilkan 1 Batu tiap 30 menit, menumpuk sampai 5 Batu lalu berhenti sampai diambil. Penambang tidak butuh makan, tapi perlu perawatan: tekan tombol 🔧 Bayar Perawatan · 10 🪙 di kartu penambang untuk membuatnya bekerja selama 1 jam. Koin TIDAK dipotong otomatis — penambang hanya bekerja setelah kamu membayar, dan jeda bila masa perawatannya habis sampai kamu membayar lagi. Batu dijual di Pasar seharga 25 🪙.", "Each miner produces 1 Batu every 30 minutes, stacking up to 5 Batu, then stops until collected. Miners don't need food, but they need maintenance: tap the 🔧 Pay Maintenance · 10 🪙 button on a miner's card to make it work for 1 hour. Coins are NEVER deducted automatically — a miner only works after you pay, and pauses when its paid maintenance runs out until you pay again. Batu sells at the Market for 25 🪙.") + '</p>';
+  html += '<div class="row" style="margin-bottom:10px"><button class="btn-green grow" data-mact="collectall"' + (totalReady ? "" : " disabled") + '>🧺 ' + tr("Ambil Semua", "Collect All") + (totalReady ? ' · ' + totalReady + ' ⛏️' : '') + '</button>' +
+    '<button class="btn-amber grow" data-mact="buy"' + (S.miners.length >= MINER_MAX ? " disabled" : "") + '>👷 ' + tr("Beli Penambang · ", "Buy Miner · ") + fmt(MINER_BUY) + ' 🪙</button></div>';
+  html += '<div id="miner-cards"></div></div>';
+  wrap.innerHTML = html;
+  var cwrap = wrap.querySelector("#miner-cards");
+  if (!S.miners.length) {
+    cwrap.innerHTML = '<p class="small muted">' + tr("Belum ada penambang — beli penambang pertamamu untuk mulai menambang.", "No miners yet — buy your first miner to start mining.") + '</p>';
+  }
+  S.miners.forEach(function(m){
+    var d = document.createElement("div");
+    d.className = "animal-card";
+    var full = m.ready >= STACK_MAX;
+    var paidMs = minerPaidMs(m, nowMs());
+    var paused = paidMs <= 0;
+    var status = paused ? tr("⏸️ Jeda — bayar perawatan untuk bekerja lagi", "⏸️ Paused — pay maintenance to work again")
+      : full ? tr("⛏️ Penuh " + m.ready + "/" + STACK_MAX + " — ambil dulu agar menambang lagi", "⛏️ Full " + m.ready + "/" + STACK_MAX + " — collect to resume mining")
+      : (m.ready > 0 ? tr("⛏️ " + m.ready + "/" + STACK_MAX + " Siap diambil!", "⛏️ " + m.ready + "/" + STACK_MAX + " Ready to collect!") : tr("Sedang menambang", "Mining"));
+    var nextTxt = paused ? tr("Jeda", "Paused") : full ? tr("Penuh!", "Full!") : (m.nextAt ? mmss(m.nextAt - nowMs()) : "—");
+    /* Tombol Bayar Perawatan: HANYA aktif saat masa perawatan habis
+       (penambang jeda). Selama sisa masa berbayar masih ada, tombol
+       nonaktif dan labelnya menampilkan sisa waktu itu — menekan
+       (atau handler-nya) tidak memotong koin apa pun. */
+    var payBtn = paused
+      ? '<button class="btn-amber btn-small grow" data-mact="payupkeep" data-uid="' + m.uid + '">🔧 ' + tr("Bayar Perawatan · ", "Pay Maintenance · ") + fmt(MINER_UPKEEP) + tr(" koin", " coins") + '</button>'
+      : '<button class="btn-amber btn-small grow" data-mact="payupkeep" data-uid="' + m.uid + '" disabled>🔧 ' + tr("Perawatan: ", "Maintenance: ") + fmtPaidLeft(paidMs) + '</button>';
+    d.innerHTML = '<div class="row-between"><b>👷 ' + tr("Penambang", "Miner") + ' #' + m.num + '</b><span class="small">' + status + '</span></div>' +
+      '<div class="row small" style="margin:5px 0"><span>⛏️ <b>' + (m.ready||0) + '/' + STACK_MAX + '</b></span><span>⏱️ ' + tr("Batu berikutnya: ", "Next Batu: ") + '<span class="cd">' + nextTxt + '</span></span></div>' +
+      '<div class="row small" style="margin:0 0 5px"><span>🔧 ' + tr("Perawatan: ", "Maintenance: ") + (paused ? tr("habis", "expired") : fmtPaidLeft(paidMs)) + '</span>' + (paused ? '<span style="color:var(--danger);font-weight:700">⏸️ ' + tr("Jeda — bayar perawatan untuk bekerja lagi", "Paused — pay maintenance to work again") + '</span>' : '') + '</div>' +
+      '<div class="row" style="margin:0 0 5px">' + payBtn + '</div>' +
+      '<div class="row"><button class="btn-green btn-small" data-mact="collect" data-uid="' + m.uid + '"' + (m.ready > 0 ? "" : " disabled") + '>' + tr("Ambil ", "Collect ") + '⛏️ ' + (m.ready||0) + '/' + STACK_MAX + '</button>' +
+      '<button class="btn-danger btn-small" data-mact="sell" data-uid="' + m.uid + '">' + tr("Jual Penambang ", "Sell Miner ") + '#' + m.num + ' · +' + fmt(MINER_SELLBACK) + ' 🪙</button></div>';
+    cwrap.appendChild(d);
+  });
+  wrap.querySelectorAll("button[data-mact]").forEach(function(btn){
+    btn.onclick = function(){
+      var act = btn.dataset.mact, uid = btn.dataset.uid;
+      var m = S.miners.find(function(x){ return x.uid === uid; });
+      if (act === "buy") {
+        if (S.miners.length >= MINER_MAX) return;
+        if (!spendCoins(MINER_BUY)) { renderStatus(); return; }
+        S.minerSeq = (S.minerSeq || 0) + 1;
+        /* Penambang baru mulai dalam keadaan JEDA: belum ada masa
+           perawatan berbayar — ia mulai bekerja hanya setelah pemain
+           menekan tombol Bayar Perawatan di kartunya. */
+        S.miners.push({ uid: "m" + Date.now() + "_" + S.minerSeq, num: S.minerSeq, nextAt: null, remainingMs: MINER_CYCLE*1000, ready: 0, upkeepUntil: null, upkeepRemainingMs: 0, pausedUpkeep: true });
+        toast(tr("👷 Penambang ", "👷 Miner ") + "#" + S.minerSeq + tr(" dibeli — bayar perawatan untuk mulai menambang", " bought — pay maintenance to start mining")); haptic("success"); save(); renderAll();
+      } else if (act === "payupkeep" && m) {
+        /* Penjaga kedua selain atribut disabled: bila masa perawatan
+           masih tersisa, jangan potong koin apa pun. */
+        if (minerPaidMs(m, nowMs()) > 0) return;
+        payMinerUpkeep(m); save(); renderAll();
+      } else if (act === "collectall") {
+        var n = 0;
+        S.miners.forEach(function(x){ if (x.ready > 0) n += collectMiner(x, true); });
+        if (n) { toast(tr("🧺 " + n + " Batu diambil dari tambang", "🧺 " + n + " Batu collected from the mine")); haptic("success"); save(); renderAll(); }
+      } else if (act === "collect" && m) { collectMiner(m); save(); renderAll(); }
+      else if (act === "sell" && m) {
+        if (!confirmInPage(tr("Jual Penambang #" + m.num + " seharga " + fmt(MINER_SELLBACK) + " 🪙?", "Sell Miner #" + m.num + " for " + fmt(MINER_SELLBACK) + " 🪙?"))) return;
+        addCoins(MINER_SELLBACK);
+        S.miners = S.miners.filter(function(x){ return x.uid !== m.uid; });
+        toast(tr("👷 Penambang ", "👷 Miner ") + "#" + m.num + tr(" terjual", " sold")); haptic(); save(); renderAll();
+      }
+    };
+  });
+}
+
 /* ================= RENDER: STATUS & BALAI KOTA ================= */
 function renderStatus(){
   $("sb-coins").textContent = fmt(S.coins);
@@ -1209,6 +1484,7 @@ function renderBalaiKota(){
         '<p class="small">🌾 ' + tr("Tanaman: ", "Crops: ") + (crops.length ? crops.map(function(c){ return c.em + " " + cName(c); }).join(", ") : "—") + "</p>" +
         '<p class="small">🐾 ' + tr("Hewan: ", "Animals: ") + (animals.length ? animals.map(function(k){ return ANIMALS[k].em + " " + aName(ANIMALS[k]); }).join(", ") : "—") + "</p>" +
         (L === 4 ? '<p class="small">💎 ' + tr("Tarik Gram terbuka (min. 0,5 Gram)", "Gram withdrawal unlocks (min. 0.5 Gram)") + "</p>" : "") +
+        (L === 4 ? '<p class="small">⛏️ ' + tr("Tambang terbuka — beli penambang & jual Batu di Pasar", "Mine unlocks — buy miners & sell Batu at the Market") + "</p>" : "") +
         "</div>";
     }
     $("bk-levels").innerHTML = html;
@@ -1504,14 +1780,12 @@ function renderMarket(){
   var ids = Object.keys(S.inv).filter(function(id){ return S.inv[id] > 0; });
   var total = 0;
   if (!ids.length) list.innerHTML = '<p class="muted small">' + tr("Gudang kosong — panen tanaman atau ambil produk hewan dulu.", "Storage is empty — harvest crops or collect animal products first.") + '</p>';
-  var mult = sellMultiplier();
-  if (mult > 1) list.innerHTML = '<p class="small" style="margin-bottom:6px">👑 <b>Premium Pass ' + tr("aktif", "active") + '</b> — ' + tr("harga jual semua hasil 2× lipat!", "all produce sells for 2×!") + '</p>' + list.innerHTML;
   ids.forEach(function(id){
     var info = itemInfo(id), n = S.inv[id];
-    var price = info.sell * mult;
+    var price = info.sell;
     total += price * n;
     var row = document.createElement("div"); row.className = "inv-row";
-    row.innerHTML = '<span class="em">' + info.em + '</span><div class="grow"><b>' + info.name + '</b><div class="small muted">' + n + ' item · ' + price + ' 🪙 / item' + (mult > 1 ? ' (2× 👑)' : '') + '</div></div>' +
+    row.innerHTML = '<span class="em">' + info.em + '</span><div class="grow"><b>' + info.name + '</b><div class="small muted">' + n + ' item · ' + price + ' 🪙 / item' + '</div></div>' +
       '<button class="btn-small" data-sell1="' + id + '">' + tr("Jual 1", "Sell 1") + '</button><button class="btn-small btn-green" data-sellall="' + id + '">' + tr("Jual Semua · ", "Sell All · ") + fmt(price*n) + ' 🪙</button>';
     list.appendChild(row);
   });
@@ -1522,10 +1796,10 @@ function renderMarket(){
 function sellItem(id, n){
   if (!S.inv[id] || n <= 0) return;
   var info = itemInfo(id);
-  var gain = info.sell * sellMultiplier() * n;
+  var gain = info.sell * n;
   S.inv[id] -= n; addCoins(gain);
   track("sell", n); addXp(n);
-  toast("🏪 " + info.name + " ×" + n + tr(" terjual", " sold") + " · +" + fmt(gain) + " 🪙" + (sellMultiplier() > 1 ? " (2× 👑)" : "")); haptic("success");
+  toast("🏪 " + info.name + " ×" + n + tr(" terjual", " sold") + " · +" + fmt(gain) + " 🪙"); haptic("success");
   save(); renderAll();
 }
 
@@ -1658,7 +1932,6 @@ function renderPremium(){
               : ("💤 " + tr("Tidak aktif", "Not active"))) + '</span></div>' +
     '<p class="small" style="margin-top:8px"><b>' + tr("Harga: ", "Price: ") + fmtGram(PREMIUM_PRICE_GRAM) + ' Gram</b> · ' + tr("Durasi ", "Duration ") + PREMIUM_DAYS + tr(" hari", " days") + '</p>' +
     '<ul class="premium-benefits small">' +
-      '<li>🌾 ' + tr("Hasil panen 2× — koin dari menjual hasil panen & produk ternak jadi 2× lipat", "2× harvest returns — coins from selling crops & animal products are doubled") + '</li>' +
       '<li>🌱 ' + tr("+1 petak tambahan gratis, di atas batas Balai Kota", "+1 free extra plot, above the Town Hall limit") + '</li>' +
       '<li>⚡ ' + tr("Tanaman tumbuh 25% lebih cepat", "Crops grow 25% faster") + '</li>' +
       '<li>🎁 ' + tr("Hadiah harian ", "Daily reward of ") + fmt(PREMIUM_DAILY_COINS) + tr(" koin, bisa diklaim tiap hari selama pass aktif", " coins, claimable every day while the pass is active") + '</li>' +
@@ -1900,7 +2173,8 @@ function renderAll(){
   ensureDailyClaimState();
   ensurePlots();
   S.animals.forEach(settleAnimal);
-  renderStatus(); renderTH(); renderBalaiKota(); renderSeeds(); renderPlots(); renderPens();
+  if (Array.isArray(S.miners)) S.miners.forEach(settleMiner);
+  renderStatus(); renderTH(); renderBalaiKota(); renderSeeds(); renderPlots(); renderPens(); renderTambang();
   renderMarket(); renderDailyClaim(); renderMissions(); renderGram(); renderFriends();
 }
 /* render ringan tiap detik: hanya hitung mundur & status */
@@ -1908,7 +2182,8 @@ var lastGrowFactor = null;
 var lastWdCancelSig = null;
 function tickRender(){
   S.animals.forEach(settleAnimal);
-  renderStatus(); renderTH(); renderBalaiKota(); renderPlots(); renderPens(); renderDailyClaim(); renderMissions(); renderFriends(); renderPremium();
+  if (Array.isArray(S.miners)) S.miners.forEach(settleMiner);
+  renderStatus(); renderTH(); renderBalaiKota(); renderPlots(); renderPens(); renderTambang(); renderDailyClaim(); renderMissions(); renderFriends(); renderPremium();
   /* Batas waktu batal penarikan: bila ada permintaan "menunggu" yang baru
      saja melewati 10 menit, render ulang tab Gram agar tombol Batalkan
      langsung nonaktif tanpa pemain harus berpindah tab dulu. */
@@ -2021,7 +2296,7 @@ $("btn-upgrade-th2").addEventListener("click", upgradeTH);
 $("btn-sell-all").addEventListener("click", function(){
   var total = 0, count = 0;
   Object.keys(S.inv).forEach(function(id){
-    var n = S.inv[id] || 0; if (n > 0) { total += itemInfo(id).sell * sellMultiplier() * n; count += n; S.inv[id] = 0; }
+    var n = S.inv[id] || 0; if (n > 0) { total += itemInfo(id).sell * n; count += n; S.inv[id] = 0; }
   });
   if (!count) { toast(tr("Gudang kosong", "Storage is empty")); haptic("error"); return; }
   addCoins(total); track("sell", count); addXp(count);
@@ -2131,7 +2406,7 @@ function applyStaticTexts(){
   set("seed-help", tr("Ketuk benih, lalu ketuk petak kosong untuk menanam. Ketuk tanaman yang siap untuk memanen.", "Tap a seed, then tap an empty plot to plant it. Tap a ready crop to harvest it."));
   set("market-title", tr("🏪 Pasar — Gudang Hasil", "🏪 Market — Produce Storage"));
   set("btn-sell-all", tr("Jual Semua", "Sell All"));
-  set("market-desc", tr("Jual hasil panen dan produk ternak dari gudang untuk mendapatkan koin.", "Sell harvested crops and animal products from storage to earn coins."));
+  set("market-desc", tr("Jual hasil panen, produk ternak, dan Batu dari tambang dari gudang untuk mendapatkan koin.", "Sell harvested crops, animal products, and Batu from the mine from storage to earn coins."));
   set("inv-total-label", tr("Total nilai gudang", "Total storage value"));
   set("mission-title", tr("📋 Misi Harian", "📋 Daily Missions"));
   set("mission-desc", tr("Misi diperbarui setiap hari. Selesaikan dan klaim hadiahnya.", "Missions refresh every day. Complete them and claim the rewards."));
@@ -2174,7 +2449,7 @@ function applyStaticTexts(){
   setH("redeem-desc", tr("Masukkan kode undangan teman untuk bonus sambutan <b>+150 🪙 +25 XP</b> (sekali pakai).", "Enter a friend's invite code for a welcome bonus of <b>+150 🪙 +25 XP</b> (one-time)."));
   set("btn-redeem", tr("Tukar Kode", "Redeem Code"));
   set("footer-note", tr("Progres tersimpan otomatis di perangkat ini.", "Progress is saved automatically on this device."));
-  var tabNames = { kebun: tr("Kebun", "Garden"), ternak: tr("Ternak", "Livestock"), pasar: tr("Pasar", "Market"), misi: tr("Misi", "Missions"), gram: "Gram", premium: "Premium", balaikota: tr("Balai Kota", "Town Hall"), teman: tr("Teman", "Friends") };
+  var tabNames = { kebun: tr("Kebun", "Garden"), ternak: tr("Ternak", "Livestock"), tambang: tr("Tambang", "Mine"), pasar: tr("Pasar", "Market"), misi: tr("Misi", "Missions"), gram: "Gram", premium: "Premium", balaikota: tr("Balai Kota", "Town Hall"), teman: tr("Teman", "Friends") };
   document.querySelectorAll("button[data-tab]").forEach(function(b){
     var s = b.querySelector(".tab-label"); if (s && tabNames[b.dataset.tab]) s.textContent = tabNames[b.dataset.tab];
   });
@@ -2184,6 +2459,10 @@ loadState();
 /* Migrasi save lama: 'ready' hewan dulu boolean (maks 1 hasil per hewan) —
    sekarang angka tumpukan hasil 0..STACK_MAX (maks 5 per hewan). */
 S.animals.forEach(function(a){ a.ready = (typeof a.ready === "number") ? Math.max(0, Math.min(STACK_MAX, Math.floor(a.ready))) : (a.ready ? 1 : 0); });
+/* Normalisasi tambang untuk save lama (fitur baru): penambang & nomor urutnya */
+if (!Array.isArray(S.miners)) S.miners = [];
+if (typeof S.minerSeq !== "number" || isNaN(S.minerSeq)) S.minerSeq = S.miners.length;
+S.miners.forEach(function(m){ m.ready = (typeof m.ready === "number") ? Math.max(0, Math.min(STACK_MAX, Math.floor(m.ready))) : (m.ready ? 1 : 0); });
 applyStaticTexts();
 ensureDaily();
 /* normalisasi petak (termasuk +1 petak Premium Pass bila aktif) */
