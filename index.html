@@ -240,6 +240,16 @@
       .inv-row .em{font-size:26px}
       .mission{border:1px solid var(--line);border-radius:14px;padding:11px;margin-bottom:9px;background:var(--card2)}
       .mission.done{opacity:.75}
+      /* Klaim Harian — grid streak 7 hari, ringkas agar muat di layar HP sempit */
+      #daily-claim-card{padding:12px 10px;overflow:hidden}
+      .daily-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px;margin:8px 0 10px;width:100%}
+      .daily-day{border:1px solid var(--line);border-radius:9px;background:var(--card2);
+        padding:5px 0 4px;text-align:center;min-width:0;overflow:hidden}
+      .daily-day .dlabel{font-size:9px;color:var(--muted);font-weight:700;display:block;white-space:nowrap;line-height:1.2}
+      .daily-day .damt{font-size:11px;font-weight:800;display:block;margin-top:1px;white-space:nowrap;letter-spacing:-.3px;line-height:1.25}
+      .daily-day.claimed{background:var(--green-soft);border-color:var(--green);color:var(--green-d)}
+      .daily-day.claimed .dlabel{color:var(--green-d)}
+      .daily-day.today{border-color:var(--amber);background:var(--amber-soft)}
       .shop-item{border:1px solid var(--line);border-radius:14px;padding:12px;margin-bottom:9px;background:var(--card2)}
       .price-tag{font-weight:800;color:var(--green-d)}
       .gram-price{font-weight:800;color:#7a4fd0}
@@ -347,6 +357,9 @@
 
       <!-- MISI -->
       <section class="tabpage" id="page-misi">
+        <div class="card" id="daily-claim-card">
+          <div id="daily-claim-content"></div>
+        </div>
         <div class="card">
           <h2 id="mission-title">📋 Misi Harian</h2>
           <p class="small muted" id="mission-desc">Misi diperbarui setiap hari. Selesaikan dan klaim hadiahnya.</p>
@@ -482,7 +495,7 @@
     </div>
 
     <nav class="tabbar">
-      <button data-tab="kebun" class="active"><span class="tic">🌾</span><span class="tab-label">Kebun</span></button>
+      <button data-tab="kebun" class="active"><span class="tic">🌾</span><span class="tab-label">Kebun</span><span class="tab-badge" id="badge-kebun" style="display:none">0</span></button>
       <button data-tab="ternak"><span class="tic">🐄</span><span class="tab-label">Ternak</span><span class="tab-badge" id="badge-ternak" style="display:none">0</span></button>
       <button data-tab="pasar"><span class="tic">🏪</span><span class="tab-label">Pasar</span></button>
       <button data-tab="misi"><span class="tic">📋</span><span class="tab-label">Misi</span><span class="tab-badge" id="badge-misi" style="display:none">0</span></button>
@@ -645,6 +658,12 @@ function payWithTon(amountGram, onSuccess){
     toast(tr("❌ Pembayaran dibatalkan atau gagal — tidak ada Gram yang terkirim", "❌ Payment cancelled or failed — no Gram was sent")); haptic("error");
   });
 }
+/* Klaim Harian gratis (semua pemain) — streak 7 hari:
+   hari 1–6 = 100,200,300,400,500,600; hari 7 = 700 + bonus 300 = 1.000.
+   Total streak penuh seminggu = 3.100 koin.
+   Setelah hari ke-7 streak kembali ke hari 1; bolos 1 hari = kembali ke hari 1.
+   Terpisah dari hadiah harian Premium Pass (1.000 koin/hari). */
+var DAILY_CLAIM_REWARDS = [100,200,300,400,500,600,1000];
 var MISSION_POOL = [
   {key:"plant",   label:"Tanam benih", labelEn:"Plant seeds",        target:5,  rc:150, rx:10},
   {key:"harvest", label:"Panen tanaman", labelEn:"Harvest crops",      target:5,  rc:200, rx:12},
@@ -785,6 +804,7 @@ function freshState() {
     feedStock: {ayam:0, sapi:0, domba:0},
     animalSeq: {ayam:0, sapi:0, domba:0},
     daily: null,
+    dailyClaim: { lastDate: "", streak: 0 },
     inviteCode: genCode(), friends: [], milesClaimed: [], redeemed: false,
     wallet: false, withdrawals: [],
     premiumUntil: 0, premiumLastClaim: "",
@@ -1185,6 +1205,15 @@ function renderPlots(){
       alertEl.classList.remove("show");
     }
   }
+  /* Badge merah di tombol tab Kebun — sama seperti badge Ternak:
+     muncul hanya bila ada tanaman siap panen, angkanya = jumlah
+     tanaman yang siap panen, hilang bila tidak ada. Diperbarui
+     tiap renderPlots (renderAll & tickRender tiap detik). */
+  var kb = $("badge-kebun");
+  if (kb) {
+    kb.style.display = readyCount ? "flex" : "none";
+    kb.textContent = readyCount;
+  }
 }
 /* Ketuk pemberitahuan siap panen → gulir ke petak siap panen pertama
    dan sorot sebentar. Gulir dibatasi agar tidak melewati akhir konten. */
@@ -1408,6 +1437,86 @@ function sellItem(id, n){
   save(); renderAll();
 }
 
+/* ================= KLAIM HARIAN (STREAK) ================= */
+function dateStrOffset(offsetDays){
+  var d = new Date(); d.setDate(d.getDate() + offsetDays);
+  return d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0");
+}
+function ensureDailyClaimState(){
+  if (!S.dailyClaim || typeof S.dailyClaim !== "object") S.dailyClaim = { lastDate: "", streak: 0 };
+  if (typeof S.dailyClaim.lastDate !== "string") S.dailyClaim.lastDate = "";
+  if (typeof S.dailyClaim.streak !== "number" || isNaN(S.dailyClaim.streak)) S.dailyClaim.streak = 0;
+  S.dailyClaim.streak = Math.max(0, Math.min(7, Math.floor(S.dailyClaim.streak)));
+}
+/* Info klaim harian untuk hari ini.
+   - claimedToday: hadiah hari ini sudah diklaim.
+   - displayStreak: jumlah hari dalam siklus berjalan yang sudah diklaim
+     & masih berlaku (0 bila streak putus / siklus baru belum mulai).
+   - nextDay: hari streak (1–7) untuk klaim berikutnya (atau yang baru
+     saja diklaim bila claimedToday).
+   - nextReward: koin untuk nextDay. */
+function dailyClaimInfo(){
+  ensureDailyClaimState();
+  var today = todayStr(), yest = dateStrOffset(-1);
+  var last = S.dailyClaim.lastDate || "";
+  var streak = S.dailyClaim.streak || 0;
+  var claimedToday = (last === today);
+  var continues = (last === yest);
+  var displayStreak;
+  if (claimedToday) displayStreak = streak;
+  else if (continues) displayStreak = (streak >= 7 ? 0 : streak);
+  else displayStreak = 0;
+  var nextDay = claimedToday ? Math.max(1, streak) : (displayStreak + 1);
+  return {
+    claimedToday: claimedToday,
+    canClaim: !claimedToday,
+    continues: continues,
+    streak: streak,
+    displayStreak: displayStreak,
+    nextDay: nextDay,
+    nextReward: DAILY_CLAIM_REWARDS[nextDay - 1]
+  };
+}
+function claimDailyReward(){
+  var info = dailyClaimInfo();
+  if (info.claimedToday) { toast(tr("🎁 Klaim Harian sudah diambil hari ini — kembali besok ya!", "🎁 Today's Daily Claim is already taken — come back tomorrow!")); haptic("error"); return; }
+  var today = todayStr(), yest = dateStrOffset(-1);
+  var last = S.dailyClaim.lastDate || "";
+  var streak = S.dailyClaim.streak || 0;
+  var newStreak;
+  if (last === yest && streak >= 1 && streak < 7) newStreak = streak + 1;
+  else newStreak = 1; /* pertama kali, streak putus, atau siklus baru setelah hari ke-7 */
+  var reward = DAILY_CLAIM_REWARDS[newStreak - 1];
+  S.dailyClaim = { lastDate: today, streak: newStreak };
+  addCoins(reward);
+  if (newStreak === 7) toast(tr("🎁 Klaim Harian Hari ke-7 · +", "🎁 Daily Claim Day 7 · +") + fmt(reward) + tr(" 🪙 (termasuk bonus 300 🪙) — streak selesai, besok mulai lagi dari Hari ke-1!", " 🪙 (including the 300 🪙 bonus) — streak complete, tomorrow starts again from Day 1!"));
+  else toast(tr("🎁 Klaim Harian Hari ke-", "🎁 Daily Claim Day ") + newStreak + " · +" + fmt(reward) + " 🪙");
+  haptic("success");
+  save(); renderAll();
+}
+function renderDailyClaim(){
+  var box = $("daily-claim-content");
+  if (!box) return;
+  var info = dailyClaimInfo();
+  var grid = "";
+  for (var d = 1; d <= 7; d++) {
+    var claimed = d <= info.displayStreak;
+    var isToday = !info.claimedToday && d === info.nextDay;
+    var cls = "daily-day" + (claimed ? " claimed" : "") + (isToday ? " today" : "");
+    grid += '<div class="' + cls + '"><span class="dlabel">H' + d + (claimed ? ' ✓' : '') + '</span>' +
+      '<span class="damt">' + fmt(DAILY_CLAIM_REWARDS[d-1]) + '</span></div>';
+  }
+  box.innerHTML =
+    '<h2 style="margin-bottom:2px">🎁 ' + tr("Klaim Harian", "Daily Claim") + '</h2>' +
+    '<div class="daily-grid">' + grid + '</div>' +
+    '<button class="btn-green grow js-claim-daily" style="width:100%"' + (info.canClaim ? "" : " disabled") + '>' +
+      (info.canClaim ? ("🎁 " + tr("Klaim Hari ke-", "Claim Day ") + info.nextDay + " · +" + fmt(info.nextReward) + " 🪙")
+                     : ("✅ " + tr("Sudah Diklaim Hari Ini", "Already Claimed Today"))) + '</button>';
+  box.querySelectorAll(".js-claim-daily").forEach(function(btn){
+    btn.onclick = function(){ claimDailyReward(); };
+  });
+}
+
 /* ================= RENDER: MISI ================= */
 function renderMissions(){
   ensureDaily();
@@ -1432,8 +1541,10 @@ function renderMissions(){
       toast(tr("📋 Misi selesai · +", "📋 Mission complete · +") + fmt(m.rc) + " 🪙"); haptic("success"); save(); renderAll();
     };
   });
+  /* Badge tab Misi = misi yang siap diklaim + Klaim Harian bila hari ini belum diklaim */
+  var badgeCount = claimable + (dailyClaimInfo().canClaim ? 1 : 0);
   var badge = $("badge-misi");
-  badge.style.display = claimable ? "flex" : "none"; badge.textContent = claimable;
+  badge.style.display = badgeCount ? "flex" : "none"; badge.textContent = badgeCount;
 }
 
 /* ================= RENDER: PREMIUM PASS (GRAM ASLI VIA TON CONNECT) ================= */
@@ -1589,15 +1700,16 @@ function renderFriends(){
 /* ================= RENDER SEMUA ================= */
 function renderAll(){
   ensureDaily();
+  ensureDailyClaimState();
   ensurePlots();
   S.animals.forEach(settleAnimal);
   renderStatus(); renderTH(); renderBalaiKota(); renderSeeds(); renderPlots(); renderPens();
-  renderMarket(); renderMissions(); renderGram(); renderFriends();
+  renderMarket(); renderDailyClaim(); renderMissions(); renderGram(); renderFriends();
 }
 /* render ringan tiap detik: hanya hitung mundur & status */
 function tickRender(){
   S.animals.forEach(settleAnimal);
-  renderStatus(); renderTH(); renderBalaiKota(); renderPlots(); renderPens(); renderMissions(); renderFriends(); renderPremium();
+  renderStatus(); renderTH(); renderBalaiKota(); renderPlots(); renderPens(); renderDailyClaim(); renderMissions(); renderFriends(); renderPremium();
 }
 </script>
 
@@ -1852,6 +1964,7 @@ ensureDaily();
 if (S.lb) delete S.lb; /* bersihkan data leaderboard lama dari save */
 if (typeof S.premiumUntil !== "number") S.premiumUntil = 0;
 if (typeof S.premiumLastClaim !== "string") S.premiumLastClaim = "";
+ensureDailyClaimState();
 while (S.plots.length < S.plotsOwned) S.plots.push(null);
 ensurePlots();
 S.animals.forEach(settleAnimal);
